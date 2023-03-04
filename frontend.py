@@ -53,15 +53,15 @@ class App(ctk.CTk):
 
         # Open VST UI Button
         self.vstIcon = ctk.CTkImage(Image.open(os.path.join(assetsPath, "vstIcon.png")), size = (25, 25))
-        self.openVST = ctk.CTkButton(self.navigationPane, corner_radius = 0, height = 40, border_spacing = 10, text = "Open VST UI", font=("Trebuchet MS", 20), fg_color = "transparent",
+        self.openVST = ctk.CTkButton(self.navigationPane, corner_radius = 0, width = 190, height = 30, border_spacing = 10, text = "Open VST UI", font=("Trebuchet MS", 20), fg_color = "transparent",
                                      text_color = ("black", "white"), hover_color = ("gray", "gray"), image = self.vstIcon, anchor = tk.CENTER, command = None)
-        self.openVST.grid(row = 2, column = 0, padx = 20, sticky = "ew")
+        self.openVST.grid(row = 2, column = 0, padx = 20, sticky = "ns")
 
         # Upload Brush Button
         self.brushIcon = ctk.CTkImage(Image.open(os.path.join(assetsPath, "brushIcon.png")), size = (25, 25))
-        self.openBrush = ctk.CTkButton(self.navigationPane, corner_radius = 0, height = 40, border_spacing = 10, text = "Upload Brush", font=("Trebuchet MS", 20), fg_color = "transparent",
-                                     text_color = ("black", "white"), hover_color = ("gray", "gray"), image = self.vstIcon, anchor = tk.CENTER, command = None)
-        self.openBrush.grid(row = 3, column = 0, padx = 20, sticky = "ew")
+        self.openBrush = ctk.CTkButton(self.navigationPane, corner_radius = 0, width = 190, height = 30, border_spacing = 10, text = "Upload Brush", font=("Trebuchet MS", 20), fg_color = "transparent",
+                                     text_color = ("black", "white"), hover_color = ("gray", "gray"), image = self.brushIcon, anchor = tk.CENTER, command = None)
+        self.openBrush.grid(row = 3, column = 0, padx = 20, sticky = "ns")
 
         # Y-Padding Label
         self.yPaddingLabel = ctk.CTkLabel(self.navigationPane, text = f"Y-Padding: {y_padding}")
