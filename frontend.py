@@ -41,21 +41,21 @@ class App(ctk.CTk):
 
         # File Name Label
         self.nameLabel = ctk.CTkLabel(self.navigationPane, text = "File Name:")
-        self.nameLabel.grid(row = 0, column = 0, padx = 10, pady = 20)
+        self.nameLabel.grid(row = 0, column = 0, padx = 30, pady = 20)
 
         # Upload File Button
         self.generateFileButton = ctk.CTkButton(self.navigationPane, width = 10, height = 30, corner_radius = 0, text = "Upload File", command = self.generateResults)
-        self.generateFileButton.grid(row = 0, column = 0, padx = 10, pady = 10, sticky = "ew")
+        self.generateFileButton.grid(row = 0, column = 0, padx = 80, pady = 10, sticky = "ns")
 
         # Display File Name Label
-        self.displayBox = ctk.CTkTextbox(self.navigationPane, width = 200, height = 100)
-        self.displayBox.grid(row = 2, column = 0, columnspan = 4, padx = 20, pady = 0, sticky = "nsew")
+        self.displayBox = ctk.CTkTextbox(self.navigationPane, width = 200, height = 50)
+        self.displayBox.grid(row = 1, column = 0, columnspan = 4, padx = 20, pady = 0, sticky = "nsew")
 
         # Open VST UI Button
         self.vstIcon = ctk.CTkImage(Image.open(os.path.join(assetsPath, "vstIcon.png")), size = (25, 25))
-        self.openVST = ctk.CTkButton(self.navigationPane, corner_radius = 0, height = 40, border_spacing = 10, text = "Open VST", fg_color = "transparent",
+        self.openVST = ctk.CTkButton(self.navigationPane, corner_radius = 0, height = 40, border_spacing = 10, text = "Open VST UI", fg_color = "transparent",
                                      text_color = ("black", "white"), hover_color = ("gray", "gray"), image = self.vstIcon, anchor = tk.CENTER, command = None)
-        self.openVST.grid(row = 1, column = 0, sticky = "ew")
+        self.openVST.grid(row = 2, column = 0, padx = 40, sticky = "ns")
 
         # Y-Padding Label
         self.yPaddingLabel = ctk.CTkLabel(self.navigationPane, text = f"Y-Padding: {y_padding}")
