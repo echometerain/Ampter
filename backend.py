@@ -9,32 +9,32 @@ from matplotlib import pyplot as plt
 import pyaudio
 
 
-FOURIER_WSIZE = 2000     # fourier window size for the fft
+FOURIER_WSIZE = 2048    # fourier window size for the fft
 brush = None            # vst3 plugin object from pedalboard
 song = np.array([])     # song object as np array
-spec = None             # spectrogram image
+spec = io.BytesIO()     # spectrogram image
 sample_rate = 0
 num_frames = 0
 
 
-def play():
+def play():  # doesn't work
     p = pyaudio.PyAudio()
-    stream = p.open(format=pyaudio.paInt16, channels=len(
-        song), rate=sample_rate, output=True)
-    stream.write(song.tobytes())
-    stream.stop_stream()
-    stream.close()
-    p.terminate()
+    stream = p.open(format=pyaudio.paFloat32, channels=1,
+                    rate=sample_rate, output=True)
+    # stream.write(song.tobytes())
+    # stream.stop_stream()
+    # stream.close()
+    # p.terminate()
 
 
-def load_brush(path):  # load brush from VST3 path
+def load_brush(path):  # load brush from VST3 path, working
     global brush
     if path == None:
         return False
-    brush = pb._pedalboard.load_plugin(path)
+    brush = pb._pedalboard.VST3Plugin(path)
 
 
-def load_song(path):  # load song from song path
+def load_song(path):  # load song from song path, working
     global song, sample_rate, num_frames
     if path == None:
         return False
@@ -44,7 +44,7 @@ def load_song(path):  # load song from song path
         num_frames = f.frames
 
 
-def save_song(path):
+def save_song(path):  # saves song to a path, working
     global song
     if path == None:
         return False
@@ -52,7 +52,7 @@ def save_song(path):
         f.write(song)
 
 
-def get_spectrogram():
+def get_spectrogram():  # get spectrogram, working
     global song
 
     f, t, Sxx = signal.spectrogram(song, sample_rate, nfft=2048)
@@ -69,21 +69,40 @@ def get_spectrogram():
 
     # render spectrogram and save as image in memory
     plt.pcolormesh(t, f, Sxx, shading='gouraud')
-    buf = io.BytesIO()
-    plt.savefig(buf, format='png')
-    buf.seek(0)
-    im = Image.open(buf)
-    buf.close()
-
-    return im
+    plt.savefig(spec, format='png')
 
 
-def paint(a, b, slope, a_int, p, path):  # call this when the user paints
+def show_spec():
+    spec.seek(0)
+    im = Image.open(spec)
+    im.show()
+
+
+def butter_bandpass(lowcut, highcut, order=5):
+    nyq = 2 * sample_rate
+    low = lowcut / nyq
+    high = highcut / nyq
+    b, a = signal.butter(order, [low, high], btype='band')
+    return b, a
+
+
+def butter_bandpass_filter(data, lowcut, highcut, order=5):
+    b, a = butter_bandpass(lowcut, highcut, order=order)
+    y = signal.lfilter(b, a, data)
+    return y
+
+
+def isolate():
+    with AF("test.mp3", "w", num_channels=1, samplerate=sample_rate) as f:
+        f.write(sfft.ifft(butter_bandpass_filter(sfft.fft(song), 5, 10000)).real)
+
+
+def paint(a, b, slope, a_int, p):  # call this when the user paints
+    # a and b is stored in terms of fourier_wsize
     # if brush == None or song.size == 0:
     #     return False
-    # a and b is stored in terms of fourier_wsize
 
-    for i in range(a, b):
-        song_freq = sfft.fft(song[a, i])
+    for i in range(a, b-2):
+        song_freq = sfft.fft(song[i*FOURIER_WSIZE: (i+2)*FOURIER_WSIZE])
         plt.plot(np.arange(0, len(song_freq)), song_freq)
         plt.show()
