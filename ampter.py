@@ -1,9 +1,8 @@
 import numpy as np
 import scipy
 import pedalboard as pb
-import ffmpeg
-import tkinter as tk
-import customtkinter as ctk
+import backend as be
+import frontend as fe
 
-FOURIER_WSIZE = 200
-Y_PADDING = 500  # how thick the brush is (y direction)
+be.load_song("/home/hhwl/Documents/bono.mp3")
+# be.paint(0, 0, 0, 0, 0)
