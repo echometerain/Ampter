@@ -17,14 +17,14 @@ sample_rate = 0
 num_frames = 0
 
 
-def play():  # doesn't work
+def play():
     p = pyaudio.PyAudio()
     stream = p.open(format=pyaudio.paFloat32, channels=1,
-                    rate=sample_rate, output=True)
-    # stream.write(song.tobytes())
-    # stream.stop_stream()
-    # stream.close()
-    # p.terminate()
+                    rate=int(sample_rate), output=True)
+    stream.write(song.tobytes())
+    stream.stop_stream()
+    stream.close()
+    p.terminate()
 
 
 def load_brush(path):  # load brush from VST3 path, working
