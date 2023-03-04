@@ -23,27 +23,23 @@ class App(ctk.CTk):
 
         self.title("Ampter - Audio Mastering Painter")
 
-        self.geometry("600x600")  # Dimensions = 500x600
+        self.geometry("500x800")  # Dimensions = 500x800
 
-        # Name Label
-        self.nameLabel = ctk.CTkLabel(self, text="File Name:")
-        self.nameLabel.grid(row=0, column=0, padx=20, pady=20, sticky="ew")
+        # File Name Label
+        self.nameLabel = ctk.CTkLabel(self, text = "File Name:")
+        self.nameLabel.grid(row = 0, column = 0, padx = 20, pady = 20, sticky = "ew")
 
-        # Name Entry Field
-        self.fileEntry = ctk.CTkEntry(self, placeholder_text="Enter here.")
-        self.fileEntry.grid(row=1, column=0, columnspan=3,
-                            padx=20, pady=20, sticky="ew")
+        # TESTING ONLY - File Name Entry Field
+        self.fileEntry = ctk.CTkEntry(self, placeholder_text = "Enter here.")
+        self.fileEntry.grid(row = 1, column = 0, columnspan = 3, padx = 20, pady = 20, sticky = "ew")
 
-        # Generate Button
-        self.generateFileButton = ctk.CTkButton(
-            self, text="Upload File", command=self.generateResults)
-        self.generateFileButton.grid(
-            row=0, column=1, columnspan=2, padx=20, pady=20, sticky="ew")
+        # Upload File Button
+        self.generateFileButton = ctk.CTkButton(self, text = "Upload File", command = self.generateResults)
+        self.generateFileButton.grid(row = 0, column = 1, columnspan = 2, padx = 20, pady = 20, sticky = "ew")
 
-        # Text Box
-        self.displayBox = ctk.CTkTextbox(self, width=200, height=100)
-        self.displayBox.grid(row=2, column=0, columnspan=4,
-                             padx=20, pady=20, sticky="nsew")
+        # Display File Name Text Box
+        self.displayBox = ctk.CTkTextbox(self, width = 200, height = 100)
+        self.displayBox.grid(row = 2, column = 0, columnspan = 4, padx = 20, pady = 20, sticky = "nsew")
 
     # This function is used to insert the details entered by users into the textbox.
 
