@@ -1,4 +1,4 @@
-# import ampter as amp
+import backend as be
 import numpy as np
 import scipy
 import pedalboard as pb
@@ -39,10 +39,6 @@ class App(ctk.CTk):
         self.navigationPane.grid(row = 0, column = 0, sticky = "nsew")
         self.navigationPane.grid_rowconfigure(4, weight = 1)
 
-        # File Name Label
-        self.nameLabel = ctk.CTkLabel(self.navigationPane, text = "File Name:")
-        self.nameLabel.grid(row = 0, column = 0, padx = 30, pady = 20)
-
         # Upload File Button
         self.generateFileButton = ctk.CTkButton(self.navigationPane, width = 190, height = 30, corner_radius = 0, text = "Upload File", font=("Trebuchet MS", 20), command = self.generateResults)
         self.generateFileButton.grid(row = 1, column = 0, columnspan = 4, padx = 20, pady = 0, sticky = "ew")
@@ -52,24 +48,24 @@ class App(ctk.CTk):
         self.displayBox.grid(row = 0, column = 0, columnspan = 4, padx = 20, pady = 10, sticky = "ew")
 
         # Open VST UI Button
-        self.vstIcon = ctk.CTkImage(Image.open(os.path.join(assetsPath, "vstIcon.png")), size = (25, 25))
-        self.openVST = ctk.CTkButton(self.navigationPane, corner_radius = 0, width = 190, height = 30, border_spacing = 10, text = "Open VST UI", font=("Trebuchet MS", 20), fg_color = "transparent",
-                                     text_color = ("black", "white"), hover_color = ("gray", "gray"), image = self.vstIcon, anchor = tk.CENTER, command = None)
-        self.openVST.grid(row = 2, column = 0, padx = 20, sticky = "ns")
+        # self.vstIcon = ctk.CTkImage(Image.open(os.path.join(assetsPath, "vstIcon.png")), size = (25, 25))
+        # self.openVST = ctk.CTkButton(self.navigationPane, corner_radius = 0, width = 190, height = 30, border_spacing = 10, text = "Open VST UI", font=("Trebuchet MS", 20), fg_color = "transparent",
+        #                              text_color = ("black", "white"), hover_color = ("gray", "gray"), image = self.vstIcon, anchor = tk.CENTER, command = None)
+        # self.openVST.grid(row = 2, column = 0, padx = 20, sticky = "ns")
 
         # Upload Brush Button
-        self.brushIcon = ctk.CTkImage(Image.open(os.path.join(assetsPath, "brushIcon.png")), size = (25, 25))
-        self.openBrush = ctk.CTkButton(self.navigationPane, corner_radius = 0, width = 190, height = 30, border_spacing = 10, text = "Upload Brush", font=("Trebuchet MS", 20), fg_color = "transparent",
-                                     text_color = ("black", "white"), hover_color = ("gray", "gray"), image = self.brushIcon, anchor = tk.CENTER, command = None)
-        self.openBrush.grid(row = 3, column = 0, padx = 20, sticky = "ns")
+        # self.brushIcon = ctk.CTkImage(Image.open(os.path.join(assetsPath, "brushIcon.png")), size = (25, 25))
+        # self.openBrush = ctk.CTkButton(self.navigationPane, corner_radius = 0, width = 190, height = 30, border_spacing = 10, text = "Upload Brush", font=("Trebuchet MS", 20), fg_color = "transparent",
+        #                              text_color = ("black", "white"), hover_color = ("gray", "gray"), image = self.brushIcon, anchor = tk.CENTER, command = None)
+        # self.openBrush.grid(row = 3, column = 0, padx = 20, sticky = "ns")
 
         # Y-Padding Label
-        self.yPaddingLabel = ctk.CTkLabel(self.navigationPane, text = f"Y-Padding: {y_padding}")
-        self.yPaddingLabel.grid(row = 4, column = 0, padx = 10, pady = 10)
+        # self.yPaddingLabel = ctk.CTkLabel(self.navigationPane, text = f"Y-Padding: {y_padding}")
+        # self.yPaddingLabel.grid(row = 4, column = 0, padx = 10, pady = 10)
 
         # Y-Padding Slider
-        self.yPaddingSlider = ctk.CTkSlider(self.navigationPane, width = 200, height = 15, command = self.yPaddingSliderChange)
-        self.yPaddingSlider.place(relx = 0.5, rely = 0.5, anchor = "center")
+        # self.yPaddingSlider = ctk.CTkSlider(self.navigationPane, width = 200, height = 15, command = self.yPaddingSliderChange)
+        # self.yPaddingSlider.place(relx = 0.5, rely = 0.5, anchor = "center")
         # 0.4 * pos = y-padding
 
         # Appearance Mode Label
@@ -87,7 +83,7 @@ class App(ctk.CTk):
     # This function is used to insert the details entered by users into the textbox.
 
     def generateResults(self):
-        filePath = ctk.filedialog.askopenfilename(filetypes = (("3G2 File", "*.3g2"), ("3GP File", "*.3gp"), ("AAC File", "*.aac"),
+        filePath = ctk.filedialog.askopenfilename(filetypes = (("All Files", "*.*"), ("3G2 File", "*.3g2"), ("3GP File", "*.3gp"),
                                                                ("AC3 File", "*.ac3"), ("ADTS File", "*.adts"), ("AIF File", "*.aif"),
                                                                ("AIFC File", "*.aifc"), ("AIFF File", "*.aiff"), ("AMR File", "*.amr"),
                                                                ("AU File", "*.au"), ("BWF File", "*.bwf"), ("CAF File", "*.caf"),
@@ -97,13 +93,16 @@ class App(ctk.CTk):
                                                                ("MP2 File", "*.mp2"), ("MP3 File", "*.mp3"), ("MP4 File", "*.mp4"),
                                                                ("MPA File", "*.mpa"), ("MPEG File", "*.mpeg"), ("OGG File", "*.ogg"),
                                                                ("QT File", "*.qt"), ("SD2 File", "*.sd2"), ("SND File", "*.snd"), 
-                                                               ("W64 File", "*.w64"), ("WAV File", "*.wav"), ("XHE File", "*.xhe")))
+                                                               ("W64 File", "*.w64"), ("WAV File", "*.wav"), ("XHE File", "*.xhe"),
+                                                               ("AAC File", "*.aac")))
         self.displayBox.delete("0.0", "200.0")
         self.displayBox.insert("0.0", filePath)
 
-    def yPaddingSliderChange(self, position):
-        y_padding = position * 1000
-        print(y_padding)
+        be.load_song(filePath)
+
+    # def yPaddingSliderChange(self, position):
+    #     y_padding = position * 1000
+    #     print(y_padding)
 
     def changeAppearance(self, newOption):
         ctk.set_appearance_mode(newOption)
