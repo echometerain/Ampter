@@ -78,31 +78,55 @@ def show_spec():
     im.show()
 
 
-def butter_bandpass(lowcut, highcut, order=5):
-    nyq = 2 * sample_rate
-    low = lowcut / nyq
-    high = highcut / nyq
-    b, a = signal.butter(order, [low, high], btype='band')
-    return b, a
+# def butter_bandpass(lowcut, highcut, order=5):
+#     nyq = 3 * sample_rate
+#     low = lowcut / nyq
+#     high = highcut / nyq
+#     sos = signal.butter(order, [low, high],
+#                         analog=False, btype='band', output='sos')
+#     return sos
 
 
-def butter_bandpass_filter(data, lowcut, highcut, order=5):
-    b, a = butter_bandpass(lowcut, highcut, order=order)
-    y = signal.lfilter(b, a, data)
-    return y
+# def butter_bandpass_filter(data, lowcut, highcut, order=5):
+#     sos = butter_bandpass(lowcut, highcut, order=order)
+#     y = signal.sosfilt(sos, data)
+#     return y
 
 
-def isolate():
-    with AF("test.mp3", "w", num_channels=1, samplerate=sample_rate) as f:
-        f.write(sfft.ifft(butter_bandpass_filter(sfft.fft(song), 5, 10000)).real)
+# def isolate():
+#     # Apply the FFT to the audio data
+#     fft_data = sfft.fft(song)
+
+#     # Determine the frequency range of the data
+#     freq_range = np.linspace(0, len(fft_data), len(fft_data))
+
+#     # Define the frequency range to isolate
+#     freq_min = 10  # minimum frequency to isolate
+#     freq_max = 2000  # maximum frequency to isolate
+
+#     # Create a bandpass filter with the desired frequency range
+#     nyquist_rate = 0.5 * sample_rate
+#     cutoff_freqs = [freq_min / nyquist_rate, freq_max / nyquist_rate]
+#     b, a = signal.butter(4, cutoff_freqs, btype="band")
+
+#     # Apply the filter to the audio data
+#     filtered_data = signal.filtfilt(b, a, song)
+
+#     plt.plot(np.arange(0, len(filtered_data)), filtered_data)
+#     plt.show()
+#     with AF("test.mp3", "w", num_channels=1, samplerate=sample_rate) as f:
+#         f.write(butter_bandpass_filter(filtered_data, 700, 300))
 
 
-def paint(a, b, slope, a_int, p):  # call this when the user paints
-    # a and b is stored in terms of fourier_wsize
+def paint(a, b, a_int):  # call this when the user paints
+    # a and b is stored in terms of audio frame number
     # if brush == None or song.size == 0:
     #     return False
+    signal = np.sin(2 * np.pi * a_int * np.linspace(0, (b-a) /
+                    sample_rate, b-a, endpoint=False))
 
-    for i in range(a, b-2):
-        song_freq = sfft.fft(song[i*FOURIER_WSIZE: (i+2)*FOURIER_WSIZE])
-        plt.plot(np.arange(0, len(song_freq)), song_freq)
-        plt.show()
+    # plt.plot(np.arange(0, len(signal)), signal)
+    # plt.show()
+    # with AF("test.mp3", "w", num_channels=1, samplerate=sample_rate) as f:
+    #     f.write(signal)
+    np.add.at(song, signal, a)
