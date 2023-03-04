@@ -1,7 +1,10 @@
 {
-    "folders": [
-        {
-            "path": "."
-        }
-    ]
+  "folders": [
+    {
+      "path": ".git"
+    },
+    {
+      "path": "."
+    }
+  ]
 }
