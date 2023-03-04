@@ -48,34 +48,28 @@ def save_song(path):  # saves song to a path, working
     global song
     if path == None:
         return False
-    with AF(path, "w", num_channels=1, samplerate=sample_rate) as f:
-        f.write(song)
+    with AF(path, "w", num_channels=1, samplerate=sample_rate) as file:
+        file.write(song)
 
 
 def get_spectrogram():  # get spectrogram, working
     global song
 
-    f, t, Sxx = signal.spectrogram(song, sample_rate, nfft=2048)
+    a, b, temp_spec = signal.spectrogram(song, sample_rate, nfft=2048)
     # keep only frequencies of interest
-    freq_slice = np.where(f <= 2000)
-    f = f[freq_slice]
-    Sxx = Sxx[freq_slice, :][0]
+    a = a[np.where(a < 2000)]
+    temp_spec = temp_spec[np.where(a < 2000), :][0]
 
-    fig = plt.figure(frameon=False)  # get rig of the axis
+    fig = plt.figure(frameon=False)  # get rid of the axis
     fig.set_size_inches(num_frames/10000, 10)
     ax = plt.Axes(fig, [0., 0., 1., 1.])
     ax.set_axis_off()
     fig.add_axes(ax)
 
     # render spectrogram and save as image in memory
-    plt.pcolormesh(t, f, Sxx, shading='gouraud')
+    plt.pcolormesh(b, a, temp_spec, shading='gouraud')
     plt.savefig(spec, format='png')
-
-
-def show_spec():
     spec.seek(0)
-    im = Image.open(spec)
-    im.show()
 
 
 # def butter_bandpass(lowcut, highcut, order=5):
