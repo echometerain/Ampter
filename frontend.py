@@ -44,18 +44,24 @@ class App(ctk.CTk):
         self.nameLabel.grid(row = 0, column = 0, padx = 30, pady = 20)
 
         # Upload File Button
-        self.generateFileButton = ctk.CTkButton(self.navigationPane, width = 10, height = 30, corner_radius = 0, text = "Upload File", command = self.generateResults)
-        self.generateFileButton.grid(row = 0, column = 0, padx = 80, pady = 10, sticky = "ns")
+        self.generateFileButton = ctk.CTkButton(self.navigationPane, width = 190, height = 30, corner_radius = 0, text = "Upload File", command = self.generateResults)
+        self.generateFileButton.grid(row = 1, column = 0, columnspan = 4, padx = 20, pady = 0, sticky = "ew")
 
         # Display File Name Label
         self.displayBox = ctk.CTkTextbox(self.navigationPane, width = 200, height = 50)
-        self.displayBox.grid(row = 1, column = 0, columnspan = 4, padx = 20, pady = 0, sticky = "nsew")
+        self.displayBox.grid(row = 0, column = 0, columnspan = 4, padx = 20, pady = 10, sticky = "ew")
 
         # Open VST UI Button
         self.vstIcon = ctk.CTkImage(Image.open(os.path.join(assetsPath, "vstIcon.png")), size = (25, 25))
         self.openVST = ctk.CTkButton(self.navigationPane, corner_radius = 0, height = 40, border_spacing = 10, text = "Open VST UI", fg_color = "transparent",
                                      text_color = ("black", "white"), hover_color = ("gray", "gray"), image = self.vstIcon, anchor = tk.CENTER, command = None)
         self.openVST.grid(row = 2, column = 0, padx = 40, sticky = "ns")
+
+        # Upload Brush Button
+        self.brushIcon = ctk.CTkImage(Image.open(os.path.join(assetsPath, "brushIcon.png")), size = (25, 25))
+        self.openBrush = ctk.CTkButton(self.navigationPane, corner_radius = 0, height = 40, border_spacing = 10, text = "Upload Brush", fg_color = "transparent",
+                                     text_color = ("black", "white"), hover_color = ("gray", "gray"), image = self.vstIcon, anchor = tk.CENTER, command = None)
+        self.openBrush.grid(row = 3, column = 0, padx = 40, sticky = "ns")
 
         # Y-Padding Label
         self.yPaddingLabel = ctk.CTkLabel(self.navigationPane, text = f"Y-Padding: {y_padding}")
