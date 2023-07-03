@@ -1,15 +1,14 @@
 import numpy as np
 import io
 from PIL import Image
-from scipy import signal
-import scipy.fft as sfft
+import librosa
 import pedalboard as pb
+from pedalboard._pedalboard import Pedalboard
 from pedalboard.io import AudioFile as AF
 from matplotlib import pyplot as plt
 import pyaudio
 
 
-FOURIER_WSIZE = 2048    # fourier window size for the fft
 brush = None            # vst3 plugin object from pedalboard
 song = np.array([])     # song object as np array
 spec = io.BytesIO()     # spectrogram image
@@ -31,14 +30,14 @@ def load_brush(path):  # load brush from VST3 path, working
     global brush
     if path == None:
         return False
-    brush = pb._pedalboard.VST3Plugin(path)
+    brush = pb._pedalboard.load_plugin(path)
 
 
 def load_song(path):  # load song from song path, working
     global song, sample_rate, num_frames
     if path == None:
         return False
-    with AF(path, "r") as f:
+    with AF(path, "r") as f:  # type: ignore
         song = f.read(f.frames-1)[0]  # read only the left channel
         sample_rate = f.samplerate
         num_frames = f.frames
@@ -48,7 +47,7 @@ def save_song(path):  # saves song to a path, working
     global song
     if path == None:
         return False
-    with AF(path, "w", num_channels=1, samplerate=sample_rate) as file:
+    with AF(path, "w", num_channels=1, samplerate=sample_rate) as file:  # type: ignore
         file.write(song)
 
 
