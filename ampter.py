@@ -6,12 +6,11 @@ from customtkinter import *  # type: ignore
 from PIL import Image
 import os
 
-brush = None
-song_path = None   # path of the song
-custom_brush_path = None  # path of the VST plugin
-y_padding = 500    # how thick the brush is (y direction)
-playhead_pos = 0   # where the playhead is (# of FOURIER_WSIZEs)
-playing = [False]
+song_path = None        # path of the song
+effect_path = None      # path of the VST plugin
+brush_width = 3.0       # how thick the effect is (Q factor)
+arrow_pos_pixel = 0     # position of playhead in pixels
+playing = False
 
 # Themes: "blue" (standard), "green", "dark-blue"
 set_default_color_theme("blue")
@@ -23,7 +22,7 @@ typelist = (("All Files", "*.*"), ("3G2 File", "*.3g2"), ("3GP File", "*.3gp"), 
             "*.m4a"), ("M4B File", "*.m4b"), ("M4R File", "*.m4r"), ("MOV File", "*.mov"), ("MP1 File", "*.mp1"), ("MP2 File", "*.mp2"), ("MP3 File", "*.mp3"), ("MP4 File", "*.mp4"), ("MPA File", "*.mpa"), ("MPEG File", "*.mpeg"), ("OGG File", "*.ogg"), ("QT File", "*.qt"), ("SD2 File", "*.sd2"), ("SND File", "*.snd"), ("W64 File", "*.w64"), ("WAV File", "*.wav"), ("XHE File", "*.xhe"), ("AAC File", "*.aac"))
 
 
-def generateResults():
+def draw_spec():
     filePath = filedialog.askopenfilename(filetypes=typelist)
     displayBox.delete("0.0", "200.0")
     displayBox.insert("0.0", filePath)
@@ -33,13 +32,9 @@ def generateResults():
     spec = CTkImage(Image.open(be.spec), Image.open(
         be.spec), (be.num_frames//100, 1000))
 
-# def yPaddingSliderChange(self, position):
-#     y_padding = position * 1000
-#     print(y_padding)
-
-
-def changeAppearance(newOption):
-    set_appearance_mode(newOption)
+# def brush_widthSliderChange(self, position):
+#     brush_width = position * 1000
+#     print(brush_width)
 
 
 app = CTk()
@@ -83,16 +78,16 @@ openVST = CTkButton(navigationPane, corner_radius=0, width=190, height=30, borde
                     text_color=("black", "white"), hover_color=("gray", "gray"), image=vstIcon, anchor=tk.CENTER, command=None)
 openVST.grid(row=2, column=0, padx=20, sticky="ns")
 
-# Upload Brush Button
-brushIcon = CTkImage(Image.open(
-    os.path.join(assetsPath, "brushIcon.png")), size=(25, 25))
-openBrush = CTkButton(navigationPane, corner_radius=0, width=190, height=30, border_spacing=10, text="Upload Brush", font=("Trebuchet MS", 20), fg_color="transparent",
-                      text_color=("black", "white"), hover_color=("gray", "gray"), image=brushIcon, anchor=tk.CENTER, command=None)
-openBrush.grid(row=3, column=0, padx=20, sticky="ns")
+# Upload effect Button
+effectIcon = CTkImage(Image.open(
+    os.path.join(assetsPath, "effectIcon.png")), size=(25, 25))
+openeffect = CTkButton(navigationPane, corner_radius=0, width=190, height=30, border_spacing=10, text="Upload effect", font=("Trebuchet MS", 20), fg_color="transparent",
+                       text_color=("black", "white"), hover_color=("gray", "gray"), image=effectIcon, anchor=tk.CENTER, command=None)
+openeffect.grid(row=3, column=0, padx=20, sticky="ns")
 
 # Y-Padding Label
 yPaddingLabel = CTkLabel(
-    navigationPane, text=f"Y-Padding: {y_padding}")
+    navigationPane, text=f"brush width: {brush_width}")
 yPaddingLabel.grid(row=4, column=0, padx=10, pady=10)
 
 # Y-Padding Slider
@@ -108,7 +103,7 @@ appearanceModeLabel.place()
 
 # Appearance Change Dropdown Menu
 appearanceMode = CTkOptionMenu(navigationPane, values=[
-    "Dark", "Light", "System"], command=changeAppearance)
+    "Dark", "Light", "System"], command=set_appearance_mode)
 appearanceMode.grid(row=6, column=0, padx=20, pady=20, sticky="s")
 
 """
