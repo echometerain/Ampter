@@ -129,3 +129,4 @@ dmypy.json
 .pyre/
 
 *.mp3
+.directory

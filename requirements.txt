@@ -1,0 +1,7 @@
+pedalboard
+numpy
+pillow
+librosa
+matplotlib
+jep
+pyaudio
