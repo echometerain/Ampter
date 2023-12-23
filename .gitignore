@@ -130,3 +130,5 @@ dmypy.json
 
 *.mp3
 .directory
+.vscode
+nbproject/private
