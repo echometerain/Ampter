@@ -5,6 +5,7 @@ import librosa.display as lrdp
 from matplotlib import pyplot as plt
 import io
 import math
+import base64
 
 import pedalboard as pb
 from pedalboard.io import AudioFile as AF
@@ -12,9 +13,9 @@ import pyaudio
 
 
 effect: pb.Plugin           # vst3 plugin object from pedalboard
-ef_selected = False         # whether effect selected
+ef_selected: bool = False         # whether effect selected
 song = np.empty(0)          # song object (left, right) as np array
-spec = np.empty(0)          # spectrogram cache
+spec = np.empty(0)          # base64 spectrogram cache
 bl_size = 0                 # draws every x audio frames
 sample_rate = 0             # sample rate of song (usually 48khz)
 num_frames = 0              # number of frames in entire song
@@ -28,11 +29,13 @@ def set_song(path):
     if path == None:
         return False
     with AF(path, "r") as f:  # type: ignore
+        # get audio info from pedalboard
         sample_rate = int(f.samplerate)
         bl_size = sample_rate//4
+        # pad frames to be int multiple of bl_size
         num_frames = (f.frames//bl_size + 1)*bl_size
         song = np.empty((2, num_frames))
-        spec = np.empty((2, num_frames//bl_size), dtype=object)
+        spec = np.empty((2, num_frames//bl_size), dtype=str)
         padding = np.zeros(num_frames - f.frames + 1)
         frames = f.read(f.frames-1)
         song[0] = np.append(frames[0], padding)
@@ -73,32 +76,40 @@ def save_song(path):  # saves song to a path
 
 
 # use librosa to calculate a spectrogram
-def calc_spec(block_pos):
+def calc_spec(block_pos, channel):  # channel ∈ [0,1]
     global song
-    for i in range(2):
-        # remove matplotlib axis
-        fig = plt.figure(frameon=False)
-        ax = plt.Axes(fig, [0., 0., 1., 1.])  # type: ignore
-        ax.set_axis_off()
-        fig.add_axes(ax)
+    # remove matplotlib axis
+    fig = plt.figure(frameon=False)
+    ax = plt.Axes(fig, [0., 0., 1., 1.])  # type: ignore
+    ax.set_axis_off()
+    fig.add_axes(ax)
 
-        block = song[i][block_pos*bl_size:(block_pos+1) * bl_size]
-        # calculate spectrogram
-        spec_num = lr.feature.melspectrogram(
-            y=block, sr=sample_rate, n_fft=2048, hop_length=64)
-        # fmax=sample_rate//2 if sample_rate <= 48000 else 24000
+    # get audio block
+    block = song[channel][block_pos*bl_size:(block_pos+1) * bl_size]
+    # calculate spectrogram
+    spec_num = lr.feature.melspectrogram(
+        y=block, sr=sample_rate, n_fft=2048, hop_length=64)
+    # fmax=sample_rate//2 if sample_rate <= 48000 else 24000
 
-        # render spectrogram
-        lrdp.specshow(lr.power_to_db(spec_num), x_axis='time',
-                      y_axis='mel', sr=sample_rate, ax=ax)
-        # plt.show()
+    # render spectrogram
+    lrdp.specshow(lr.power_to_db(spec_num), x_axis='time',
+                  y_axis='mel', sr=sample_rate, ax=ax)
+    # plt.show()
 
-        # save in memory
-        buffer = io.BytesIO()
-        fig.savefig(buffer, format="JPEG")
-        buffer.seek(0)
-        spec[i][block] = Image.open(buffer)
-        plt.close(fig)
+    # save in memory
+    buffer = io.BytesIO()
+    fig.savefig(buffer, format="JPEG")
+    buffer.seek(0)
+    # save to b64 so swing can access it
+    spec[channel][block_pos] = base64.b64encode(buffer.getvalue())
+    plt.close(fig)
+
+
+def get_spec(block_pos, channel):
+    # check if block is cached
+    if not spec[channel][block_pos]:
+        calc_spec(block_pos, channel)
+    return spec[channel][block_pos]
 
 
 # from wolfsound's tutorial: https://youtu.be/wodumxEF9u0
@@ -115,42 +126,51 @@ def second_order_allpass_filter(freq, BW):
 # Q makes bandwidth appear constant on log scales
 
 
-def paint(ax, ay, bx, by, Q):
-    for i in range(2):
-        unfiltered = song[i][ax:bx]
-        filtered = np.zeros(bx-ax)
-        x1 = 0
-        x2 = 0
-        y1 = 0
-        y2 = 0
+def paint(ax, ay, bx, by, Q, channel) -> bool:  # channel ∈ [0,1]
+    unfiltered = song[channel][ax:bx]
+    filtered = np.zeros(bx-ax)
+    x1 = 0
+    x2 = 0
+    y1 = 0
+    y2 = 0
 
-        # get exponential function from two points
-        # looks like a line on a log scale
-        # https://www.desmos.com/calculator/njktci6nl3
-        base = (ay/by)**(1/(ax-bx))
+    # get exponential function from two points
+    # looks like a line on a log scale
+    # https://www.desmos.com/calculator/njktci6nl3
+    base = (ay/by)**(1/(ax-bx))
 
-        for j in range(bx-ax):  # each sample
-            freq = ay*base**j   # break frequency
-            BW = freq / Q       # bandwidth
-            m, n = second_order_allpass_filter(freq, BW)
-            x = unfiltered[j]
-            y = m[0] * x + m[1] * x1 + m[2] * x2 - n[1] * y1 - n[2] * y2
-            # prevents NaNs & infinities
-            if math.isnan(y) or math.isinf(y) or y > 2 or y < -2:
-                y = 0
+    for j in range(bx-ax):  # each sample
+        freq = ay*base**j   # break frequency
+        BW = freq / Q       # bandwidth
+        m, n = second_order_allpass_filter(freq, BW)
+        x = unfiltered[j]
+        y = m[0] * x + m[1] * x1 + m[2] * x2 - n[1] * y1 - n[2] * y2
+        # prevents NaNs & infinities
+        if math.isnan(y) or math.isinf(y) or y > 2 or y < -2:
+            y = 0
 
-            y2 = y1
-            y1 = y
-            x2 = x1
-            x1 = x
+        y2 = y1
+        y1 = y
+        x2 = x1
+        x1 = x
 
-            filtered[j] = y
+        filtered[j] = y
 
-        # exploiting destructive interference
-        bandpass = 0.5 * (unfiltered - filtered)  # all freqs except selected
-        bandstop = 0.5 * (unfiltered + filtered)  # only selected freqs
-        # apply effects to it
-        song[i][ax:bx] = bandstop + \
-            pb.process(bandpass, sample_rate, [effect])
+    # exploiting destructive interference
+    bandpass = 0.5 * (unfiltered - filtered)  # all freqs except selected
+    bandstop = 0.5 * (unfiltered + filtered)  # only selected freqs
+    # apply effects to it
+    song[channel][ax:bx] = bandstop + \
+        pb.process(bandpass, sample_rate, [effect])
 
     return True
+
+
+def set_bl_size(val):
+    global bl_size
+    bl_size = val
+
+
+def get_bl_size():
+    global bl_size
+    return bl_size
