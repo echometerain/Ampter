@@ -1,11 +1,11 @@
 import numpy as np
-from PIL import Image
 import librosa as lr
 import librosa.display as lrdp
 from matplotlib import pyplot as plt
 import io
 import math
 import base64
+from PIL import Image
 
 import pedalboard as pb
 from pedalboard.io import AudioFile as AF
@@ -13,7 +13,7 @@ import pyaudio
 
 
 effect: pb.Plugin           # vst3 plugin object from pedalboard
-ef_selected: bool = False         # whether effect selected
+ef_selected: bool = False   # whether effect selected
 song = np.empty(0)          # song object (left, right) as np array
 spec = np.empty(0)          # base64 spectrogram cache
 bl_size = 0                 # draws every x audio frames
@@ -52,10 +52,16 @@ def play():  # untested
     p.terminate()
 
 
-def set_effect(name):
-    global effect
-    if name == "Gain":
-        effect = pb.Gain(20)
+def set_gain(db):
+    global effect, ef_selected
+    ef_selected = True
+    effect = pb.Gain(db)
+
+
+def set_bitcrush(depth):
+    global effect, ef_selected
+    ef_selected = True
+    effect = pb.Bitcrush(depth)
 
 
 # load effect from VST3 path
@@ -98,8 +104,17 @@ def calc_spec(block_pos, channel):  # channel ∈ [0,1]
 
     # save in memory
     buffer = io.BytesIO()
-    fig.savefig(buffer, format="JPEG")
+    fig.savefig(buffer, format="png")
     buffer.seek(0)
+    # set alpha as average of rgb (for left-right mixing)
+    img = Image.open(buffer)
+    pixels = img.load()
+    for i in range(img.size[0]):
+        for j in range(img.size[1]):
+            pixels[i, j][3] = (pixels[i, j][0] + pixels[i, j]
+                               [1] + pixels[i, j][2]) // 3
+    buffer = io.BytesIO()
+    img.save(buffer, format="png")
     # save to b64 so swing can access it
     spec[channel][block_pos] = base64.b64encode(buffer.getvalue())
     plt.close(fig)
@@ -126,7 +141,7 @@ def second_order_allpass_filter(freq, BW):
 # Q makes bandwidth appear constant on log scales
 
 
-def paint(ax, ay, bx, by, Q, channel) -> bool:  # channel ∈ [0,1]
+def paint(ax, ay, bx, by, Q, channel, wet) -> bool:  # wet ∈ [0,1]
     unfiltered = song[channel][ax:bx]
     filtered = np.zeros(bx-ax)
     x1 = 0
@@ -160,8 +175,13 @@ def paint(ax, ay, bx, by, Q, channel) -> bool:  # channel ∈ [0,1]
     bandpass = 0.5 * (unfiltered - filtered)  # all freqs except selected
     bandstop = 0.5 * (unfiltered + filtered)  # only selected freqs
     # apply effects to it
-    song[channel][ax:bx] = bandstop + \
-        pb.process(bandpass, sample_rate, [effect])
+    # wet <=> percent processed with effect
+    song[channel][ax:bx] = bandstop + wet * \
+        pb.process(bandpass, sample_rate, [effect]) + (1-wet)*bandstop
+
+    # recalculate spectrograms for changed blocks
+    for j in range(ax // bl_size, bx // bl_size):
+        calc_spec(j, channel)
 
     return True
 
@@ -174,3 +194,8 @@ def set_bl_size(val):
 def get_bl_size():
     global bl_size
     return bl_size
+
+
+def get_ef_selected():
+    global ef_selected
+    return ef_selected
