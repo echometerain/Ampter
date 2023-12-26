@@ -133,3 +133,4 @@ dmypy.json
 .vscode/*
 nbproject/private/*
 test.py
+tmpsounds/*
