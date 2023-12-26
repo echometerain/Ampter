@@ -17,13 +17,14 @@ ef_selected: bool = False   # whether effect selected
 song = np.empty(0)          # song object (left, right) as np array
 spec = np.empty(0)          # base64 spectrogram cache
 bl_size = 0                 # draws every x audio frames
+bl_freq = 4                 # width of bl in hertz
 sample_rate = 0             # sample rate of song (usually 48khz)
 num_frames = 0              # number of frames in entire song
 
 # load song from song path
 
 
-def set_song(path):
+def set_song(path):  # returns true if successful
     global song, sample_rate, num_frames, spec, bl_size
     # quits if no path
     if path == None:
@@ -31,15 +32,17 @@ def set_song(path):
     with AF(path, "r") as f:  # type: ignore
         # get audio info from pedalboard
         sample_rate = int(f.samplerate)
-        bl_size = sample_rate//4
+        bl_size = sample_rate//bl_freq
         # pad frames to be int multiple of bl_size
         num_frames = (f.frames//bl_size + 1)*bl_size
-        song = np.empty((2, num_frames))
-        spec = np.empty((2, num_frames//bl_size), dtype=str)
+        song = np.empty([2, num_frames])
+        spec = np.empty([2, num_frames//bl_size], dtype=object)
+        # print(spec)
         padding = np.zeros(num_frames - f.frames + 1)
         frames = f.read(f.frames-1)
         song[0] = np.append(frames[0], padding)
         song[1] = np.append(frames[1], padding)
+        return True
 
 
 def play():  # untested
@@ -98,26 +101,29 @@ def calc_spec(block_pos, channel):  # channel ∈ [0,1]
     # fmax=sample_rate//2 if sample_rate <= 48000 else 24000
 
     # render spectrogram
-    lrdp.specshow(lr.power_to_db(spec_num), x_axis='time',
-                  y_axis='mel', sr=sample_rate, ax=ax)
+    lrdp.specshow(lr.power_to_db(spec_num, top_db=100), x_axis='time',
+                  y_axis='mel', sr=sample_rate, ax=ax, shading='gouraud', cmap=plt.colormaps['magma'])
     # plt.show()
 
     # save in memory
     buffer = io.BytesIO()
     fig.savefig(buffer, format="png")
     buffer.seek(0)
+    plt.close(fig)
+
     # set alpha as average of rgb (for left-right mixing)
     img = Image.open(buffer)
     pixels = img.load()
     for i in range(img.size[0]):
         for j in range(img.size[1]):
-            pixels[i, j][3] = (pixels[i, j][0] + pixels[i, j]
-                               [1] + pixels[i, j][2]) // 3
+            p = pixels[i, j]
+            pixels[i, j] = (p[0], p[1], p[2], (pixels[i, j][0] + pixels[i, j]
+                                               [1] + pixels[i, j][2]) // 3)
     buffer = io.BytesIO()
+    img.save(f"{block_pos}_{channel}.png")
     img.save(buffer, format="png")
     # save to b64 so swing can access it
     spec[channel][block_pos] = base64.b64encode(buffer.getvalue())
-    plt.close(fig)
 
 
 def get_spec(block_pos, channel):
@@ -139,6 +145,7 @@ def second_order_allpass_filter(freq, BW):
 
 # paint using brush
 # Q makes bandwidth appear constant on log scales
+# y denotes frequency so exp(y-coord) must be used
 
 
 def paint(ax, ay, bx, by, Q, channel, wet) -> bool:  # wet ∈ [0,1]
