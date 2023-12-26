@@ -132,3 +132,4 @@ dmypy.json
 .directory
 .vscode/*
 nbproject/private/*
+test.py
