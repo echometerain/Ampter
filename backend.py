@@ -10,22 +10,26 @@ from PIL import Image
 import pedalboard as pb
 from pedalboard.io import AudioFile as AF
 import pyaudio
+from ampter import Ampter  # type: ignore
 
 
-effect: pb.Plugin           # vst3 plugin object from pedalboard
+effect: pb.Plugin            # effect plugin
 ef_selected: bool = False   # whether effect selected
 song = np.empty(0)          # song object (left, right) as np array
-spec = np.empty(0)          # base64 spectrogram cache
+# spec = np.empty(0)        # base64 spectrogram cache
 bl_size = 0                 # draws every x audio frames
 bl_freq = 4                 # width of bl in hertz
 sample_rate = 0             # sample rate of song (usually 48khz)
 num_frames = 0              # number of frames in entire song
+num_bl = 0                  # number of blocks
+redraw = False              # ask the gui to redraw everything
+is_vst = False              # check if selected plugin is a vst
 
 # load song from song path
 
 
 def set_song(path):  # returns true if successful
-    global song, sample_rate, num_frames, spec, bl_size
+    global song, sample_rate, num_frames, spec, bl_size, num_bl
     # quits if no path
     if path == None:
         return False
@@ -33,37 +37,55 @@ def set_song(path):  # returns true if successful
         # get audio info from pedalboard
         sample_rate = int(f.samplerate)
         bl_size = sample_rate//bl_freq
-        # pad frames to be int multiple of bl_size
         num_frames = (f.frames//bl_size + 1)*bl_size
-        song = np.empty([2, num_frames])
-        spec = np.empty([2, num_frames//bl_size], dtype=object)
-        # print(spec)
+        num_bl = num_frames//bl_size
+        song = np.empty([2, num_frames], np.float32)
+
+        # using obj dtype for variable str len
+        spec = np.empty([2, num_bl], dtype=object)
+
+        # pad frames to be int multiple of bl_size
         padding = np.zeros(num_frames - f.frames + 1)
+
+        # read all frames
         frames = f.read(f.frames-1)
         song[0] = np.append(frames[0], padding)
         song[1] = np.append(frames[1], padding)
         return True
 
 
-def play():  # untested
+def play():  # tested
+    global num_frames, bl_size, sample_rate
     p = pyaudio.PyAudio()
-    stream = p.open(format=pyaudio.paFloat32, channels=1,
+    stream = p.open(format=pyaudio.paFloat32, channels=2,
                     rate=int(sample_rate), output=True)
-    stream.write(song.tobytes())
-    stream.stop_stream()
-    stream.close()
-    p.terminate()
+    buf = np.empty(bl_size*2, np.float32)
+    for start_frame in range(0, (num_frames//bl_size) * bl_size, bl_size):
+        # awful way to stop playback
+        if not Ampter.getPlaying():
+            stream.stop_stream()
+            stream.close()
+            break
+        end_frame = start_frame + bl_size-1
+        # interleave 2 channels into 1 for playback
+        # [1,3,5,7] + [2,4,6,8] => [1,2,3,4,5,6,7,8]
+        buf[0:(2 * bl_size - 2):2] = song[0][start_frame: end_frame]
+        buf[1:(2 * bl_size - 1):2] = song[1][start_frame: end_frame]
+        stream.write(buf.tobytes())
+    # p.terminate()
 
 
 def set_gain(db):
     global effect, ef_selected
     ef_selected = True
+    is_vst = False
     effect = pb.Gain(db)
 
 
 def set_bitcrush(depth):
     global effect, ef_selected
     ef_selected = True
+    is_vst = False
     effect = pb.Bitcrush(depth)
 
 
@@ -74,6 +96,13 @@ def set_vst_effect(path):
         return False
     effect = pb._pedalboard.load_plugin(path)
     ef_selected = True
+    is_vst = True
+
+
+def open_vst_ui():
+    global effect, ef_selected, is_vst
+    if ef_selected and is_vst:
+        effect.show_editor()  # type: ignore
 
 
 def save_song(path):  # saves song to a path
@@ -85,6 +114,7 @@ def save_song(path):  # saves song to a path
 
 
 # use librosa to calculate a spectrogram
+# also put them in muxed cache
 def calc_spec(block_pos, channel):  # channel ∈ [0,1]
     global song
     # remove matplotlib axis
@@ -111,7 +141,7 @@ def calc_spec(block_pos, channel):  # channel ∈ [0,1]
     buffer.seek(0)
     plt.close(fig)
 
-    # set alpha as average of rgb (for left-right mixing)
+    # set alpha as average of rgb (for visualizing stereo audio)
     img = Image.open(buffer)
     pixels = img.load()
     for i in range(img.size[0]):
@@ -120,17 +150,10 @@ def calc_spec(block_pos, channel):  # channel ∈ [0,1]
             pixels[i, j] = (p[0], p[1], p[2], (pixels[i, j][0] + pixels[i, j]
                                                [1] + pixels[i, j][2]) // 3)
     buffer = io.BytesIO()
-    img.save(f"{block_pos}_{channel}.png")
+    # img.save(f"{block_pos}_{channel}.png")
     img.save(buffer, format="png")
     # save to b64 so swing can access it
-    spec[channel][block_pos] = base64.b64encode(buffer.getvalue())
-
-
-def get_spec(block_pos, channel):
-    # check if block is cached
-    if not spec[channel][block_pos]:
-        calc_spec(block_pos, channel)
-    return spec[channel][block_pos]
+    return base64.b64encode(buffer.getvalue())
 
 
 # from wolfsound's tutorial: https://youtu.be/wodumxEF9u0
@@ -186,9 +209,9 @@ def paint(ax, ay, bx, by, Q, channel, wet) -> bool:  # wet ∈ [0,1]
     song[channel][ax:bx] = bandstop + wet * \
         pb.process(bandpass, sample_rate, [effect]) + (1-wet)*bandstop
 
-    # recalculate spectrograms for changed blocks
-    for j in range(ax // bl_size, bx // bl_size):
-        calc_spec(j, channel)
+    # # recalculate spectrograms for changed blocks
+    # for j in range(ax // bl_size, bx // bl_size):
+    #     calc_spec(j, channel)
 
     return True
 
