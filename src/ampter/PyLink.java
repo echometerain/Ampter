@@ -15,11 +15,41 @@ import java.util.logging.*;
  *
  * @author hhwl
  */
+// python interface singleton
 public class PyLink implements Runnable {
 
     static Queue<Object[]> q = new LinkedList<>(); // py command queue
-    SharedInterpreter interp; // python interpreter
-    int delta = 25; // backend processing latency
+    static SharedInterpreter interp; // python interpreter
+    static int delta = 25; // backend processing latency
+    static int pointer = 0; // pointer which draws spectrogram blocks
+    int lastViewLeft = 0;
+
+    // go to nearest unloaded block and calculate its spectrogram
+    public void writeSpec() {
+        // adjust write pointer when viewport is scrolled left
+        int vLeft = Ampter.getViewLeft();
+        if (vLeft < lastViewLeft) {
+            pointer = vLeft / Ampter.ppb;
+        }
+        // skip written blocks
+        while (Ampter.specs[0][pointer] != null) {
+            pointer++;
+            // loop around if at end
+            if (pointer >= Ampter.num_bl) {
+                pointer = 0;
+            }
+        }
+        // get spec data from python
+        byte[] data;
+        try {
+            data = (byte[]) interp.invoke("calc_spec", pointer, 0);
+            Ampter.specs[0][pointer] = ImageIO.read(new ByteArrayInputStream(data));
+            data = (byte[]) interp.invoke("calc_spec", pointer, 1);
+            Ampter.specs[1][pointer] = ImageIO.read(new ByteArrayInputStream(data));
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        }
+    }
 
     public void call(Object[] args) {
         switch ((PyCalls) args[0]) {
@@ -33,18 +63,11 @@ public class PyLink implements Runnable {
             case LOAD_AUDIO:
                 interp.invoke("set_song", args[1]);
                 Ampter.setSpecs(new BufferedImage[2][Ampter.getSample_rate()]);
-                try {
-                    byte[] data;
-                    for (int i = 0; i < Ampter.getNum_bl() - 1; i++) {
-                        data = (byte[]) interp.invoke("calc_spec", i, 0);
-                        Ampter.specs[0][i] = ImageIO.read(new ByteArrayInputStream(data));
-                        data = (byte[]) interp.invoke("calc_spec", i, 1);
-                        Ampter.specs[1][i] = ImageIO.read(new ByteArrayInputStream(data));
-                        System.out.println("here!!!");
-                    }
-                } catch (IOException ex) {
-                    ex.printStackTrace();
-                }
+                Ampter.setAudioLoaded(true);
+                System.out.println(Ampter.getNum_bl() * Ampter.getPpb());
+                ((Realport) args[2]).setSize(Ampter.getNum_bl() * Ampter.getPpb(), (int) (args[3]));
+                System.out.println(((Realport) args[2]).getSize());
+
                 break;
         }
     }
@@ -70,6 +93,10 @@ public class PyLink implements Runnable {
             }
             if (!q.isEmpty()) {
                 call(q.poll());
+            } else {
+                if (Ampter.isAudioLoaded()) {
+                    writeSpec();
+                }
             }
         }
     }

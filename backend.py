@@ -135,7 +135,7 @@ def calc_spec(block_pos, channel):  # channel ∈ [0,1]
     block = song[channel][block_pos*bl_size:(block_pos+1) * bl_size]
     # calculate spectrogram
     spec_num = lr.feature.melspectrogram(
-        y=block, sr=sample_rate, n_fft=2048, hop_length=64)
+        y=block, sr=sample_rate, n_fft=2048, hop_length=128)
     # fmax=sample_rate//2 if sample_rate <= 48000 else 24000
 
     # render spectrogram
@@ -149,17 +149,17 @@ def calc_spec(block_pos, channel):  # channel ∈ [0,1]
     buffer.seek(0)
     plt.close(fig)
 
-    # set alpha as average of rgb (for visualizing stereo audio)
-    img = Image.open(buffer)
-    pixels = img.load()
-    for i in range(img.size[0]):
-        for j in range(img.size[1]):
-            p = pixels[i, j]
-            pixels[i, j] = (p[0], p[1], p[2], (pixels[i, j][0] + pixels[i, j]
-                                               [1] + pixels[i, j][2]) // 3)
-    buffer = io.BytesIO()
-    # img.save(f"{block_pos}_{channel}.png")
-    img.save(buffer, format="gif")
+    # # set alpha as average of rgb (for visualizing stereo audio)
+    # img = Image.open(buffer)
+    # pixels = img.load()
+    # for i in range(img.size[0]):
+    #     for j in range(img.size[1]):
+    #         p = pixels[i, j]
+    #         pixels[i, j] = (p[0], p[1], p[2], (pixels[i, j][0] + pixels[i, j]
+    #                                            [1] + pixels[i, j][2]) // 3)
+    # buffer = io.BytesIO()
+    # # img.save(f"{block_pos}_{channel}.png")
+    # img.save(buffer, format="gif")
     return buffer.getvalue()
     # return np.frombuffer(buffer.getvalue(), dtype=np.byte)
 

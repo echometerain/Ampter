@@ -13,6 +13,7 @@
         </data>
         <spellchecker-wordlist xmlns="http://www.netbeans.org/ns/spellchecker-wordlist/1">
             <word>Ampter</word>
+            <word>Realport</word>
         </spellchecker-wordlist>
     </configuration>
 </project>
