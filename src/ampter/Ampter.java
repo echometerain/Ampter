@@ -4,6 +4,7 @@
  */
 package ampter;
 
+import java.awt.image.BufferedImage;
 import javax.swing.*;
 import java.util.*;
 
@@ -13,7 +14,58 @@ import java.util.*;
  */
 public class Ampter extends javax.swing.JFrame {
 
+    static BufferedImage[][] specs;
     static boolean playing = false;
+    static boolean ef_selected = false;
+    static int headPos = 0;
+    static int bl_size = 0;
+    static int sample_rate = 0;
+    static int num_frames = 0;
+    static int num_bl = 0;
+
+    public static void setSpecs(BufferedImage[][] specs) {
+        Ampter.specs = specs;
+    }
+
+    public static int getHeadPos() {
+        return headPos;
+    }
+
+    public static void setHeadPos(int headPos) {
+        Ampter.headPos = headPos;
+    }
+
+    public static int getBl_size() {
+        return bl_size;
+    }
+
+    public static void setBl_size(int bl_size) {
+        Ampter.bl_size = bl_size;
+    }
+
+    public static int getSample_rate() {
+        return sample_rate;
+    }
+
+    public static void setSample_rate(int sample_rate) {
+        Ampter.sample_rate = sample_rate;
+    }
+
+    public static int getNum_frames() {
+        return num_frames;
+    }
+
+    public static void setNum_frames(int num_frames) {
+        Ampter.num_frames = num_frames;
+    }
+
+    public static int getNum_bl() {
+        return num_bl;
+    }
+
+    public static void setNum_bl(int num_bl) {
+        Ampter.num_bl = num_bl;
+    }
 
     public static boolean getPlaying() {
         return playing;
@@ -34,6 +86,7 @@ public class Ampter extends javax.swing.JFrame {
             ex.printStackTrace();
         }
         pyThread.start();
+        this.setIconImage(new ImageIcon("./assets/ampterIcon.png").getImage());
         initComponents();
     }
 
@@ -51,6 +104,7 @@ public class Ampter extends javax.swing.JFrame {
         jMenu2 = new javax.swing.JMenu();
         chooseFiles = new javax.swing.JFileChooser();
         viewport = new javax.swing.JPanel();
+        jScrollBar1 = new javax.swing.JScrollBar();
         leftPanel = new javax.swing.JPanel();
         loadAudio = new javax.swing.JButton();
         effectsLabel = new javax.swing.JLabel();
@@ -86,20 +140,19 @@ public class Ampter extends javax.swing.JFrame {
 
         viewport.setBackground(new java.awt.Color(0, 0, 0));
         viewport.setCursor(new java.awt.Cursor(java.awt.Cursor.DEFAULT_CURSOR));
+        viewport.setMinimumSize(new java.awt.Dimension(200, 13));
+        viewport.setPreferredSize(new java.awt.Dimension(600, 13));
+        viewport.setLayout(new java.awt.BorderLayout());
 
-        javax.swing.GroupLayout viewportLayout = new javax.swing.GroupLayout(viewport);
-        viewport.setLayout(viewportLayout);
-        viewportLayout.setHorizontalGroup(
-            viewportLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 575, Short.MAX_VALUE)
-        );
-        viewportLayout.setVerticalGroup(
-            viewportLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 701, Short.MAX_VALUE)
-        );
+        jScrollBar1.setOrientation(javax.swing.JScrollBar.HORIZONTAL);
+        viewport.add(jScrollBar1, java.awt.BorderLayout.SOUTH);
+
+        getContentPane().add(viewport, java.awt.BorderLayout.CENTER);
 
         leftPanel.setBackground(new java.awt.Color(153, 153, 153));
+        leftPanel.setPreferredSize(new java.awt.Dimension(200, 701));
 
+        loadAudio.setBackground(new java.awt.Color(0, 102, 153));
         loadAudio.setText("Load Audio");
         loadAudio.setToolTipText("");
         loadAudio.addActionListener(new java.awt.event.ActionListener() {
@@ -112,10 +165,11 @@ public class Ampter extends javax.swing.JFrame {
         effectsLabel.setText("Effects");
 
         stockList.setModel(new javax.swing.AbstractListModel<String>() {
-            String[] strings = { "Item 1", "Item 2", "Item 3", "Item 4", "Item 5" };
+            String[] strings = { "Gain", "Bitcrush", "Chorus", "Clipping", "Compressor", "Delay", "Distortion", "Reverb", "PitchShift", "Phaser", "NoiseGate" };
             public int getSize() { return strings.length; }
             public String getElementAt(int i) { return strings[i]; }
         });
+        stockList.setSelectionMode(javax.swing.ListSelectionModel.SINGLE_SELECTION);
         chooseStock.setViewportView(stockList);
 
         loadVSTButton.setText("Load VST");
@@ -200,6 +254,7 @@ public class Ampter extends javax.swing.JFrame {
             }
         });
 
+        saveAudio.setBackground(new java.awt.Color(0, 102, 153));
         saveAudio.setText("Save Audio");
         saveAudio.setToolTipText("");
         saveAudio.addActionListener(new java.awt.event.ActionListener() {
@@ -246,7 +301,7 @@ public class Ampter extends javax.swing.JFrame {
                         .addComponent(shiftForward, javax.swing.GroupLayout.PREFERRED_SIZE, 31, javax.swing.GroupLayout.PREFERRED_SIZE)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addComponent(stopReset, javax.swing.GroupLayout.PREFERRED_SIZE, 31, javax.swing.GroupLayout.PREFERRED_SIZE)))
-                .addContainerGap(28, Short.MAX_VALUE))
+                .addContainerGap(33, Short.MAX_VALUE))
         );
         leftPanelLayout.setVerticalGroup(
             leftPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -285,40 +340,34 @@ public class Ampter extends javax.swing.JFrame {
                     .addComponent(sizeSlider, javax.swing.GroupLayout.PREFERRED_SIZE, 133, javax.swing.GroupLayout.PREFERRED_SIZE))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(saveAudio)
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .addContainerGap(15, Short.MAX_VALUE))
         );
 
-        javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
-        getContentPane().setLayout(layout);
-        layout.setHorizontalGroup(
-            layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
-                .addComponent(leftPanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(0, 0, Short.MAX_VALUE)
-                .addComponent(viewport, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-        );
-        layout.setVerticalGroup(
-            layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addComponent(viewport, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-            .addComponent(leftPanel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-        );
+        getContentPane().add(leftPanel, java.awt.BorderLayout.WEST);
 
         pack();
     }// </editor-fold>//GEN-END:initComponents
 
     private void loadVSTButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_loadVSTButtonActionPerformed
-        // TODO add your handling code here:
+        chooseFiles.setFileSelectionMode(JFileChooser.FILES_AND_DIRECTORIES);
+        int returnVal = chooseFiles.showOpenDialog(this);
+        if (returnVal != JFileChooser.APPROVE_OPTION) {
+            return;
+        }
+        PyLink.q.add(new Object[]{PyCalls.METHOD, "set_vst_effect", chooseFiles.getSelectedFile().getPath()});
     }//GEN-LAST:event_loadVSTButtonActionPerformed
 
     private void VSTUIButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_VSTUIButtonActionPerformed
-        // TODO add your handling code here:
+        PyLink.q.add(new Object[]{PyCalls.METHOD, "open_vst_ui"});
     }//GEN-LAST:event_VSTUIButtonActionPerformed
 
     private void loadAudioActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_loadAudioActionPerformed
+        chooseFiles.setFileSelectionMode(JFileChooser.FILES_ONLY);
         int returnVal = chooseFiles.showOpenDialog(this);
-        if (returnVal == JFileChooser.APPROVE_OPTION) {
-            PyLink.q.add(new Object[]{PyCalls.METHOD, "set_song", chooseFiles.getSelectedFile().getPath()});
+        if (returnVal != JFileChooser.APPROVE_OPTION) {
+            return;
         }
+        PyLink.q.add(new Object[]{PyCalls.LOAD_AUDIO, chooseFiles.getSelectedFile().getPath()});
     }//GEN-LAST:event_loadAudioActionPerformed
 
     private void playPauseActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_playPauseActionPerformed
@@ -367,6 +416,7 @@ public class Ampter extends javax.swing.JFrame {
     private javax.swing.JMenu jMenu1;
     private javax.swing.JMenu jMenu2;
     private javax.swing.JMenuBar jMenuBar1;
+    private javax.swing.JScrollBar jScrollBar1;
     private javax.swing.JLabel leftLabel;
     private javax.swing.JPanel leftPanel;
     private javax.swing.JSlider leftSlider;

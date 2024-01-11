@@ -6,7 +6,8 @@ package ampter;
 
 import jep.*;
 import java.util.*;
-import javax.swing.*;
+import java.io.*;
+import javax.imageio.*;
 import java.awt.image.*;
 import java.util.logging.*;
 
@@ -16,13 +17,10 @@ import java.util.logging.*;
  */
 public class PyLink implements Runnable {
 
-    static BufferedImage[] specs;
     static Queue<Object[]> q = new LinkedList<>(); // py command queue
     SharedInterpreter interp; // python interpreter
-    int delta = 25; // frame pause
+    int delta = 25; // backend processing latency
 
-//    byte[] btDataFile = new sun.misc.BASE64Decoder().decodeBuffer(base64);
-//BufferedImage image = ImageIO.read(new ByteArrayInputStream(btDataFile));
     public void call(Object[] args) {
         switch ((PyCalls) args[0]) {
             case METHOD:
@@ -30,6 +28,22 @@ public class PyLink implements Runnable {
                     interp.invoke((String) args[1]);
                 } else {
                     interp.invoke((String) args[1], Arrays.copyOfRange(args, 2, args.length));
+                }
+                break;
+            case LOAD_AUDIO:
+                interp.invoke("set_song", args[1]);
+                Ampter.setSpecs(new BufferedImage[2][Ampter.getSample_rate()]);
+                try {
+                    byte[] data;
+                    for (int i = 0; i < Ampter.getNum_bl() - 1; i++) {
+                        data = (byte[]) interp.invoke("calc_spec", i, 0);
+                        Ampter.specs[0][i] = ImageIO.read(new ByteArrayInputStream(data));
+                        data = (byte[]) interp.invoke("calc_spec", i, 1);
+                        Ampter.specs[1][i] = ImageIO.read(new ByteArrayInputStream(data));
+                        System.out.println("here!!!");
+                    }
+                } catch (IOException ex) {
+                    ex.printStackTrace();
                 }
                 break;
         }
@@ -51,6 +65,7 @@ public class PyLink implements Runnable {
             try {
                 Thread.sleep(delta);
             } catch (InterruptedException ex) {
+                ex.printStackTrace();
                 Logger.getLogger(PyLink.class.getName()).log(Level.SEVERE, null, ex);
             }
             if (!q.isEmpty()) {

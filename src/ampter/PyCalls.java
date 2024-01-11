@@ -10,5 +10,7 @@ package ampter;
  */
 public enum PyCalls {
     METHOD, // call normal methods
-    VAR     // get normal vars
+    VAR, // get normal vars
+    PAINT,
+    LOAD_AUDIO
 }
