@@ -1,12 +1,12 @@
 import matplotlib.style as mplstyle
+from matplotlib import pyplot as plt
 from ampter import Ampter  # type: ignore
 import pyaudio
 from pedalboard.io import AudioFile as AF
 import pedalboard as pb
-from PIL import Image
+from PIL import Image, ImageOps
 import math
 import io
-from matplotlib import pyplot as plt
 import numpy as np
 import librosa as lr
 import librosa.display as lrdp
@@ -18,10 +18,12 @@ matplotlib.use('Agg')
 mplstyle.use('fast')
 
 
-# array of functions
+# array of functions that makes stock plugins
 stock_list = [pb.Gain, pb.Bitcrush, pb.Chorus, pb.Clipping, pb.Compressor,
               pb.Delay, pb.Distortion, pb.Reverb, pb.PitchShift, pb.Phaser, pb.NoiseGate]
-bl_freq = 4                 # width of bl in hertz
+bl_freq = 4                 # width of block in hertz
+hop_len = 256               # spectrogram hop length
+buf_size = 4                # size of cropped out region is spectrogram
 
 effect: pb.Plugin           # effect plugin
 song = np.empty(0)          # song object (left, right) as np array
@@ -37,10 +39,7 @@ num_bl: int                 # number of blocks
 
 
 def set_song(path):  # returns true if successful
-    global song, sample_rate, num_frames, spec, bl_size, num_bl
-    # quits if no path
-    if path == None:
-        return False
+    global song, sample_rate, num_frames, bl_size, num_bl
     with AF(path, "r") as f:  # type: ignore
         # reset info
         ef_selected = False
@@ -51,15 +50,14 @@ def set_song(path):  # returns true if successful
         num_frames = (f.frames//bl_size + 1)*bl_size
         num_bl = num_frames//bl_size
 
+        # give file info to java
         Ampter.setSample_rate(sample_rate)
         Ampter.setBl_size(bl_size)
         Ampter.setNum_frames(num_frames)
         Ampter.setNum_bl(num_bl)
 
+        # make array that holds song
         song = np.empty([2, num_frames], np.float32)
-
-        # using obj dtype for variable str len
-        spec = np.empty([2, num_bl], dtype=object)
 
         # pad frames to be int multiple of bl_size
         padding = np.zeros(num_frames - f.frames + 1)
@@ -68,16 +66,17 @@ def set_song(path):  # returns true if successful
         frames = f.read(f.frames-1)
         song[0] = np.append(frames[0], padding)
         song[1] = np.append(frames[1], padding)
-        return True
 
 
-def play():  # tested
+def play(start_pos):  # tested
     global num_frames, bl_size, sample_rate
+    # set up pyaudio
     p = pyaudio.PyAudio()
     stream = p.open(format=pyaudio.paFloat32, channels=2,
                     rate=int(sample_rate), output=True)
     buf = np.empty(bl_size*2, np.float32)
-    for start_frame in range(0, (num_frames//bl_size) * bl_size, bl_size):
+    # play every block
+    for start_frame in range(start_pos, num_frames, bl_size):
         # awful way to stop playback
         if not Ampter.getPlaying():
             stream.stop_stream()
@@ -89,7 +88,6 @@ def play():  # tested
         buf[0:(2 * bl_size - 2):2] = song[0][start_frame: end_frame]
         buf[1:(2 * bl_size - 1):2] = song[1][start_frame: end_frame]
         stream.write(buf.tobytes())
-    # p.terminate()
 
 
 # set stock effects
@@ -112,18 +110,30 @@ def set_vst_effect(path):
     effect = pb._pedalboard.load_plugin(path)
 
 
+# open vst interface
 def open_vst_ui():
     global effect, ef_selected, is_vst
     if ef_selected and is_vst:
         effect.show_editor()  # type: ignore
 
 
-def save_song(path):  # saves song to a path
+# saves song to a path
+def save_song(path):
     global song
     if path == None:
         return False
     with AF(path, "w", num_channels=2, samplerate=sample_rate) as file:  # type: ignore
         file.write(song)
+
+
+# save pyplot to pil image
+def pyplot_to_pil(fig):
+    buffer = io.BytesIO()
+    fig.savefig(buffer, format="png")
+    buffer.seek(0)
+    plt.close(fig)
+    img = Image.open(buffer)
+    return img
 
 
 # use librosa to calculate a spectrogram
@@ -134,38 +144,29 @@ def calc_spec(block_pos, channel):  # channel ∈ [0,1]
     ax = plt.Axes(fig, [0., 0., 1., 1.])  # type: ignore
     ax.set_axis_off()
     fig.add_axes(ax)
-
     # get audio block
-    block = song[channel][block_pos*bl_size:(block_pos+1) * bl_size]
+    # add buffer region to prevent artifacts
+    start = max(block_pos*bl_size - buf_size * hop_len, 0)
+    end = min((block_pos + 1)*bl_size + buf_size * hop_len, num_frames)
+    block = song[channel][start:end]
     # calculate spectrogram
     spec_num = lr.feature.melspectrogram(
-        y=block, sr=sample_rate, n_fft=2048, hop_length=512)
-    # fmax=sample_rate//2 if sample_rate <= 48000 else 24000
-
+        y=block, sr=sample_rate, n_fft=2048, hop_length=hop_len)
     # render spectrogram
     lrdp.specshow(lr.power_to_db(spec_num, top_db=100), x_axis='time',
                   y_axis='mel', sr=sample_rate, ax=ax, cmap=plt.colormaps['magma'])
-    # plt.show()
-
-    # save in memory
+    base = pyplot_to_pil(fig)
+    # use grayscale graph as alpha mask
+    mask = ImageOps.grayscale(base)
+    base.putalpha(mask)
+    width, height = base.size
+    # crop out buffer region
+    crop_out = buf_size * width // (bl_size // hop_len + 2*buf_size)
+    base = base.crop((crop_out, 0, width-crop_out, height))
+    # save
     buffer = io.BytesIO()
-    fig.savefig(buffer, format="png")
-    buffer.seek(0)
-    plt.close(fig)
-
-    # # set alpha as average of rgb (for visualizing stereo audio)
-    # img = Image.open(buffer)
-    # pixels = img.load()
-    # for i in range(img.size[0]):
-    #     for j in range(img.size[1]):
-    #         p = pixels[i, j]
-    #         pixels[i, j] = (p[0], p[1], p[2], (pixels[i, j][0] + pixels[i, j]
-    #                                            [1] + pixels[i, j][2]) // 3)
-    # buffer = io.BytesIO()
-    # # img.save(f"{block_pos}_{channel}.png")
-    # img.save(buffer, format="gif")
+    base.save(buffer, format="gif")
     return buffer.getvalue()
-    # return np.frombuffer(buffer.getvalue(), dtype=np.byte)
 
 
 # from wolfsound's tutorial: https://youtu.be/wodumxEF9u0
@@ -183,7 +184,7 @@ def second_order_allpass_filter(freq, BW):
 # y denotes frequency so exp(y-coord) must be used
 
 
-def paint(ax, ay, bx, by, Q, channel, wet) -> bool:  # wet ∈ [0,1]
+def paint(ax, ay, bx, by, Q, channel, wet):  # wet ∈ [0,1]
     unfiltered = song[channel][ax:bx]
     filtered = np.zeros(bx-ax)
     x1 = 0
@@ -220,9 +221,3 @@ def paint(ax, ay, bx, by, Q, channel, wet) -> bool:  # wet ∈ [0,1]
     # wet <=> percent processed with effect
     song[channel][ax:bx] = bandstop + wet * \
         pb.process(bandpass, sample_rate, [effect]) + (1-wet)*bandstop
-
-    # # recalculate spectrograms for changed blocks
-    # for j in range(ax // bl_size, bx // bl_size):
-    #     calc_spec(j, channel)
-
-    return True

@@ -31,44 +31,46 @@ public class PyLink implements Runnable {
         // horribly inefficient but works
         pointer = Ampter.getViewLeft() / Ampter.ppb;
         int origin = pointer;
+        BufferedImage[][] specs = Ampter.getSpecs();
+        int num_bl = Ampter.getNum_bl();
+
         // skip written blocks
-        while (Ampter.specs[0][pointer] != null) {
-            pointer++;
+        while (specs[0][pointer] != null) {
+            pointer = (pointer + 1) % num_bl;
             if (pointer == origin) {
                 Ampter.setFullCircle(true);
                 return;
-            }
-            // loop around if at end
-            if (pointer >= Ampter.num_bl) {
-                pointer = 0;
             }
         }
         // get spec data from python
         byte[] data;
         try {
             data = (byte[]) interp.invoke("calc_spec", pointer, 0);
-            Ampter.specs[0][pointer] = ImageIO.read(new ByteArrayInputStream(data));
+            specs[0][pointer] = ImageIO.read(new ByteArrayInputStream(data));
             data = (byte[]) interp.invoke("calc_spec", pointer, 1);
-            Ampter.specs[1][pointer] = ImageIO.read(new ByteArrayInputStream(data));
+            specs[1][pointer] = ImageIO.read(new ByteArrayInputStream(data));
         } catch (IOException ex) {
             ex.printStackTrace();
         }
     }
 
+    // get python to do stuff
     public void call(Object[] args) {
         switch ((PyCalls) args[0]) {
             case METHOD:
                 if (args.length == 2) {
                     interp.invoke((String) args[1]);
                 } else {
+                    // pass arguments to python functions
                     interp.invoke((String) args[1], Arrays.copyOfRange(args, 2, args.length));
                 }
                 break;
             case LOAD_AUDIO:
                 interp.invoke("set_song", args[1]);
-                Ampter.setSpecs(new BufferedImage[2][Ampter.getSample_rate()]);
+                Ampter.setSpecs(new BufferedImage[2][Ampter.getNum_bl()]);
                 Ampter.setAudioLoaded(true);
-                ((Ampter) args[2]).viewportChangePerformed();
+                // redraw realport
+                ((Ampter) args[2]).viewportChangePerformed(null);
                 break;
         }
     }
@@ -85,7 +87,7 @@ public class PyLink implements Runnable {
         interp.runScript("./backend.py");
 
         while (true) {
-            // sleep for delta ms if nothing to do
+            // sleep for delta ms
             try {
                 Thread.sleep(delta);
             } catch (InterruptedException ex) {
@@ -93,8 +95,10 @@ public class PyLink implements Runnable {
                 Logger.getLogger(PyLink.class.getName()).log(Level.SEVERE, null, ex);
             }
             if (!q.isEmpty()) {
+                // call queue if needed
                 call(q.poll());
             } else {
+                // draw specs if nothing to do
                 if (Ampter.isAudioLoaded()) {
                     writeSpec();
                 }

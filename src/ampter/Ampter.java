@@ -9,6 +9,7 @@ import java.awt.*;
 import javax.swing.*;
 import javax.swing.event.*;
 import java.util.*;
+import java.awt.event.*;
 
 /**
  *
@@ -16,22 +17,35 @@ import java.util.*;
  */
 public class Ampter extends javax.swing.JFrame {
 
-    static BufferedImage[][] specs;
+    // notenames for tooltip
+    static String[] noteNames = {"A", "Bb", "B", "C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab"};
+    static BufferedImage[][] specs; // spectrograms array [channel][block]
     static boolean playing = false;
     static boolean audioLoaded = false;
-    static boolean ef_selected = false;
-    static boolean fullCircle = false;
-    static int headPos = 0; // playhead position in terms of absolute pixels
-    static int bl_size = 0;
+    static boolean ef_selected = false; // effect selected
+    static boolean fullCircle = false; // if all the spectrograms have been calculated
+    static int headPos = 0; // playhead position (in pixels)
+    static int bl_size = 0; // block size (in audio frames)
     static int sample_rate = 0;
     static int num_frames = 0;
-    static int num_bl = 0;
-    JViewport vPort;
+    static int num_bl = 0; // total number of blocks
+    Realport realport1 = new Realport(this);
+    JViewport vPort; // viewable area of scrollpane (viewport1)
     static int viewLeft = 0; // scrollpane left
     static int viewRight = 0; // scrollpane right
-    static int realWidth = 0;
+    static int realWidth = 0; // actual width of the edit region (realport1)
     static int viewHeight = 0; // scrollpane height
     static int ppb = 100; // pixels per block
+
+    // getter setters spam
+    public double getLeftSliderLevel() {
+        // slider max is 100
+        return leftSlider.getValue() / 100.0;
+    }
+
+    public double getRightSliderLevel() {
+        return rightSlider.getValue() / 100.0;
+    }
 
     public static boolean isFullCircle() {
         return fullCircle;
@@ -113,12 +127,42 @@ public class Ampter extends javax.swing.JFrame {
         return playing;
     }
 
+    public static BufferedImage[][] getSpecs() {
+        return specs;
+    }
+
+    // get frequency info for tooltip
+    public static String freqInfo(double freq) {
+        double A4 = 440; // standard western tuning
+        double position = Math.log(freq / A4) / Math.log(2) + 4; // frequency to pitch scale
+        int octave = (int) Math.floor(position); // octave number starting on A
+        int octaveC = (int) Math.floor(position - 0.25); // starting on C (A->C is 1/4 of an octave)
+        double note = 12 * (position - octave); // decimal note value
+        if (note >= 2.5 && note < 3.0) { // prevents having both C3 & C4
+            octaveC++;
+        }
+
+        int roundNote = (int) Math.round(note); // rounded note value
+        double cents = Math.round((note - roundNote) * 100); // get cents
+        String centString = cents >= 0 ? " +" + cents : " " + cents;
+
+        return "" + Math.round(freq) + "Hz\n" + noteNames[roundNote % 12] + octaveC + centString + " cents";
+    }
+
+    // convert pixel coordinates to frequency
+    public static double pixToFreq(int pix) {
+        // mel scale position of the top of the window
+        double nyquest_mel = 2959 * Math.log10(1 + (sample_rate / 2) / 700.0);
+        double loc_mel = (viewHeight - pix) / ((double) viewHeight) * nyquest_mel;
+        return 700 * (Math.pow(10, loc_mel / 2595) - 1);
+    }
+
     /**
      * Creates new form Ampter
      */
     // create thread for jep (jep python can't multithread)
     Thread pyThread = new Thread(new PyLink());
-    Thread realThread;
+    Thread realThread; // create thread for realport
 
     public Ampter() {
         // prevents weird locale error
@@ -126,25 +170,30 @@ public class Ampter extends javax.swing.JFrame {
         // set modern look
         try {
             UIManager.setLookAndFeel("com.formdev.flatlaf.FlatDarkLaf");
-        } catch (Exception ex) {
+        } catch (ClassNotFoundException | IllegalAccessException | InstantiationException | UnsupportedLookAndFeelException ex) {
             ex.printStackTrace();
         }
-        // start singleton
+        // start python
         pyThread.start();
         // set ampter logo
         this.setIconImage(new ImageIcon("./assets/ampterIcon.png").getImage());
         initComponents();
+
         vPort = viewport1.getViewport();
-        vPort.addChangeListener(new ChangeListener() {
-            public void stateChanged(ChangeEvent evt) {
-                viewportChangePerformed();
-            }
-        });
+        // netbeans wants me to write it like this
+        vPort.addChangeListener(this::viewportChangePerformed);
+        // adding realport manually cause the gui builder crashed lol
+        viewport1.add(realport1);
+        viewport1.setViewportView(realport1);
         realThread = new Thread(realport1);
         realThread.start();
+
+        // not in the gui builder for some reason
+        stockList.addListSelectionListener(this::listValueChanged);
     }
 
-    public void viewportChangePerformed() {
+    // get new positions for viewable region when dimensions change
+    public void viewportChangePerformed(ChangeEvent evt) {
         Rectangle rect = vPort.getViewRect();
         viewLeft = rect.x;
         viewRight = viewLeft + rect.width;
@@ -153,6 +202,14 @@ public class Ampter extends javax.swing.JFrame {
         realport1.setPreferredSize(new Dimension(realWidth, viewHeight));
         viewport1.revalidate();
 //        System.out.println("" + viewLeft + " " + viewRight + " " + realWidth + " " + viewHeight);
+    }
+
+    // select stock effect
+    public void listValueChanged(ListSelectionEvent evt) {
+        if (stockList.getSelectedIndex() == -1) {
+            return;
+        }
+        VSTUIButton.setEnabled(false);
     }
 
     /**
@@ -190,7 +247,6 @@ public class Ampter extends javax.swing.JFrame {
         stopReset = new javax.swing.JButton();
         saveAudio = new javax.swing.JButton();
         viewport1 = new javax.swing.JScrollPane();
-        realport1 = new ampter.Realport();
 
         jMenu1.setText("File");
         jMenuBar1.add(jMenu1);
@@ -204,8 +260,8 @@ public class Ampter extends javax.swing.JFrame {
         setCursor(new java.awt.Cursor(java.awt.Cursor.DEFAULT_CURSOR));
         setPreferredSize(new java.awt.Dimension(1000, 750));
         addKeyListener(new java.awt.event.KeyAdapter() {
-            public void keyTyped(java.awt.event.KeyEvent evt) {
-                formKeyTyped(evt);
+            public void keyPressed(java.awt.event.KeyEvent evt) {
+                formKeyPressed(evt);
             }
         });
 
@@ -215,6 +271,7 @@ public class Ampter extends javax.swing.JFrame {
         loadAudio.setBackground(new java.awt.Color(0, 102, 153));
         loadAudio.setText("Load Audio");
         loadAudio.setToolTipText("");
+        loadAudio.setFocusable(false);
         loadAudio.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 loadAudioActionPerformed(evt);
@@ -234,10 +291,12 @@ public class Ampter extends javax.swing.JFrame {
         });
         stockList.setSelectionMode(javax.swing.ListSelectionModel.SINGLE_SELECTION);
         stockList.setEnabled(false);
+        stockList.setFocusable(false);
         chooseStock.setViewportView(stockList);
 
         loadVSTButton.setText("Load VST");
         loadVSTButton.setEnabled(false);
+        loadVSTButton.setFocusable(false);
         loadVSTButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 loadVSTButtonActionPerformed(evt);
@@ -246,6 +305,7 @@ public class Ampter extends javax.swing.JFrame {
 
         VSTUIButton.setText("Open VST UI");
         VSTUIButton.setEnabled(false);
+        VSTUIButton.setFocusable(false);
         VSTUIButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 VSTUIButtonActionPerformed(evt);
@@ -274,6 +334,7 @@ public class Ampter extends javax.swing.JFrame {
 
         sizeSlider.setOrientation(javax.swing.JSlider.VERTICAL);
         sizeSlider.setEnabled(false);
+        sizeSlider.setFocusable(false);
 
         leftLabel.setForeground(new java.awt.Color(0, 0, 0));
         leftLabel.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
@@ -282,6 +343,7 @@ public class Ampter extends javax.swing.JFrame {
         leftSlider.setOrientation(javax.swing.JSlider.VERTICAL);
         leftSlider.setValue(100);
         leftSlider.setEnabled(false);
+        leftSlider.setFocusable(false);
 
         rightLabel.setForeground(new java.awt.Color(0, 0, 0));
         rightLabel.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
@@ -290,9 +352,11 @@ public class Ampter extends javax.swing.JFrame {
         rightSlider.setOrientation(javax.swing.JSlider.VERTICAL);
         rightSlider.setValue(100);
         rightSlider.setEnabled(false);
+        rightSlider.setFocusable(false);
 
         shiftBack.setText("<<");
         shiftBack.setEnabled(false);
+        shiftBack.setFocusable(false);
         shiftBack.setMargin(new java.awt.Insets(0, 0, 0, 0));
         shiftBack.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -302,6 +366,7 @@ public class Ampter extends javax.swing.JFrame {
 
         playPause.setText(">||");
         playPause.setEnabled(false);
+        playPause.setFocusable(false);
         playPause.setMargin(new java.awt.Insets(0, 0, 0, 0));
         playPause.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -310,6 +375,7 @@ public class Ampter extends javax.swing.JFrame {
         });
 
         shiftForward.setEnabled(false);
+        shiftForward.setFocusable(false);
         shiftForward.setLabel(">>");
         shiftForward.setMargin(new java.awt.Insets(0, 0, 0, 0));
         shiftForward.addActionListener(new java.awt.event.ActionListener() {
@@ -320,6 +386,7 @@ public class Ampter extends javax.swing.JFrame {
 
         stopReset.setText("X");
         stopReset.setEnabled(false);
+        stopReset.setFocusable(false);
         stopReset.setMargin(new java.awt.Insets(0, 0, 0, 0));
         stopReset.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -331,6 +398,7 @@ public class Ampter extends javax.swing.JFrame {
         saveAudio.setText("Save Audio");
         saveAudio.setToolTipText("");
         saveAudio.setEnabled(false);
+        saveAudio.setFocusable(false);
         saveAudio.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 saveAudioActionPerformed(evt);
@@ -421,49 +489,43 @@ public class Ampter extends javax.swing.JFrame {
 
         viewport1.setBackground(new java.awt.Color(0, 0, 0));
         viewport1.setPreferredSize(new java.awt.Dimension(1000, 750));
-        viewport1.setViewportView(realport1);
-
-        realport1.setPreferredSize(new java.awt.Dimension(1000, 675));
-
-        javax.swing.GroupLayout realport1Layout = new javax.swing.GroupLayout(realport1);
-        realport1.setLayout(realport1Layout);
-        realport1Layout.setHorizontalGroup(
-            realport1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 1000, Short.MAX_VALUE)
-        );
-        realport1Layout.setVerticalGroup(
-            realport1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 682, Short.MAX_VALUE)
-        );
-
-        viewport1.setViewportView(realport1);
-
+        viewport1.setViewportView(null);
         getContentPane().add(viewport1, java.awt.BorderLayout.CENTER);
 
         pack();
     }// </editor-fold>//GEN-END:initComponents
 
     private void loadVSTButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_loadVSTButtonActionPerformed
+        // give vst file to python
         chooseFiles.setFileSelectionMode(JFileChooser.FILES_AND_DIRECTORIES);
         int returnVal = chooseFiles.showOpenDialog(this);
         if (returnVal != JFileChooser.APPROVE_OPTION) {
             return;
         }
         PyLink.q.add(new Object[]{PyCalls.METHOD, "set_vst_effect", chooseFiles.getSelectedFile().getPath()});
+
         VSTUIButton.setEnabled(true);
+        // disable stock effect
+        stockList.setSelectedIndex(-1);
+        stockList.setSelectedValue(null, false);
+        stockList.validate();
     }//GEN-LAST:event_loadVSTButtonActionPerformed
 
     private void VSTUIButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_VSTUIButtonActionPerformed
+        // open vst ui
         PyLink.q.add(new Object[]{PyCalls.METHOD, "open_vst_ui"});
     }//GEN-LAST:event_VSTUIButtonActionPerformed
 
     private void loadAudioActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_loadAudioActionPerformed
+        // give audio file to python
         chooseFiles.setFileSelectionMode(JFileChooser.FILES_ONLY);
         int returnVal = chooseFiles.showOpenDialog(this);
         if (returnVal != JFileChooser.APPROVE_OPTION) {
             return;
         }
         PyLink.q.add(new Object[]{PyCalls.LOAD_AUDIO, chooseFiles.getSelectedFile().getPath(), this});
+
+        // enable sliders and buttons
         stockList.setEnabled(true);
         loadVSTButton.setEnabled(true);
         sizeSlider.setEnabled(true);
@@ -477,11 +539,12 @@ public class Ampter extends javax.swing.JFrame {
     }//GEN-LAST:event_loadAudioActionPerformed
 
     private void playPauseActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_playPauseActionPerformed
+        // play and pause
         if (playing) {
             playing = false;
         } else {
             playing = true;
-            PyLink.q.add(new Object[]{PyCalls.METHOD, "play"});
+            PyLink.q.add(new Object[]{PyCalls.METHOD, "play", (int) (((double) headPos) / ppb * bl_size)});
         }
     }//GEN-LAST:event_playPauseActionPerformed
 
@@ -498,6 +561,7 @@ public class Ampter extends javax.swing.JFrame {
     }//GEN-LAST:event_shiftBackActionPerformed
 
     private void saveAudioActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_saveAudioActionPerformed
+        // give save file location to python
         int returnVal = chooseFiles.showSaveDialog(this);
         if (returnVal != JFileChooser.APPROVE_OPTION) {
             return;
@@ -505,9 +569,15 @@ public class Ampter extends javax.swing.JFrame {
         PyLink.q.add(new Object[]{PyCalls.METHOD, "save_song", chooseFiles.getSelectedFile().toString()});
     }//GEN-LAST:event_saveAudioActionPerformed
 
-    private void formKeyTyped(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_formKeyTyped
-        // TODO add your handling code here:
-    }//GEN-LAST:event_formKeyTyped
+    private void formKeyPressed(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_formKeyPressed
+        // play audio with space
+        switch (evt.getKeyCode()) {
+            case KeyEvent.VK_SPACE:
+                // hacky but works
+                playPauseActionPerformed(null);
+                break;
+        }
+    }//GEN-LAST:event_formKeyPressed
 
     /**
      * @param args the command line arguments
@@ -515,10 +585,8 @@ public class Ampter extends javax.swing.JFrame {
     public static void main(String args[]) {
 
         /* Create and display the form */
-        java.awt.EventQueue.invokeLater(new Runnable() {
-            public void run() {
-                new Ampter().setVisible(true);
-            }
+        java.awt.EventQueue.invokeLater(() -> {
+            new Ampter().setVisible(true);
         });
     }
 
@@ -538,7 +606,6 @@ public class Ampter extends javax.swing.JFrame {
     private javax.swing.JLabel optionsLabel;
     private javax.swing.JPanel optionsPanel;
     private javax.swing.JButton playPause;
-    private ampter.Realport realport1;
     private javax.swing.JLabel rightLabel;
     private javax.swing.JSlider rightSlider;
     private javax.swing.JButton saveAudio;

@@ -4,10 +4,12 @@
  */
 package ampter;
 
-import javax.swing.*;
+import java.awt.image.*;
 import java.awt.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.swing.*;
+import java.time.*;
 
 /**
  *
@@ -16,44 +18,58 @@ import java.util.logging.Logger;
 public class Realport extends javax.swing.JPanel implements Runnable {
 
     static int delta = 25;
+    static Ampter parent;
+    boolean dragging = false;
+    int dragFromX = 0;
+    int dragFromY = 0;
 
     /**
      * Creates new form Realport
+     *
+     * @param parent
      */
-    public Realport() {
+    public Realport(Ampter parent) {
         initComponents();
+        Realport.parent = parent;
     }
 
+    // draw realport
+    @Override
     public void paintComponent(Graphics g) {
         super.paintComponent(g);
+        // quit if no audio
         if (!Ampter.isAudioLoaded()) {
             return;
         }
+        // get needed variables
         int ppb = Ampter.getPpb();
-        int leftBlock = Ampter.getViewLeft() / ppb - 2;
-        int rightBlock = Ampter.getViewRight() / ppb + 2;
-        if (leftBlock < 0) {
-            leftBlock = 0;
-        }
-        if (rightBlock >= Ampter.num_bl) {
-            rightBlock = Ampter.num_bl;
-        }
+        int num_bl = Ampter.getNum_bl();
+        int leftBlock = Math.max(Ampter.getViewLeft() / ppb - 2, 0); // -2 & +2 for smooth scrolling
+        int rightBlock = Math.min(Ampter.getViewRight() / ppb + 2, num_bl);
         int viewHeight = Ampter.getViewHeight();
+        BufferedImage[][] specs = Ampter.getSpecs();
+
+        // paint the specs block by block
         for (int i = leftBlock; i <= rightBlock; i++) {
-            if (Ampter.specs[0][i] != null) {
-                g.drawImage(Ampter.specs[0][i], i * ppb, 0, ppb, viewHeight, this);
-            }
-            if (Ampter.specs[1][i] != null) {
-                g.drawImage(Ampter.specs[1][i], i * ppb, 0, ppb, viewHeight, this);
+            if (specs[0][i] != null && specs[1][i] != null) {
+                // draw specs with opacity determined by slider level
+                ((Graphics2D) g).setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, (float) parent.getLeftSliderLevel()));
+                g.drawImage(specs[0][i], i * ppb, 0, ppb, viewHeight, this);
+                ((Graphics2D) g).setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, (float) parent.getRightSliderLevel()));
+                g.drawImage(specs[1][i], i * ppb, 0, ppb, viewHeight, this);
             }
         }
     }
 
+    @Override
     public void run() {
+        // make tooltip never go away
+        ToolTipManager.sharedInstance().setDismissDelay(Integer.MAX_VALUE);
         while (true) {
+            // redraw every frame
             repaint();
             try {
-                // sleep for delta ms if nothing to do
+                // frame pause
                 Thread.sleep(delta);
             } catch (InterruptedException ex) {
                 Logger.getLogger(Realport.class.getName()).log(Level.SEVERE, null, ex);
@@ -75,6 +91,14 @@ public class Realport extends javax.swing.JPanel implements Runnable {
             public void mouseDragged(java.awt.event.MouseEvent evt) {
                 formMouseDragged(evt);
             }
+            public void mouseMoved(java.awt.event.MouseEvent evt) {
+                formMouseMoved(evt);
+            }
+        });
+        addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseReleased(java.awt.event.MouseEvent evt) {
+                formMouseReleased(evt);
+            }
         });
 
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(this);
@@ -90,8 +114,27 @@ public class Realport extends javax.swing.JPanel implements Runnable {
     }// </editor-fold>//GEN-END:initComponents
 
     private void formMouseDragged(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_formMouseDragged
-        // TODO add your handling code here:
+        if (!dragging) {
+            Point pos = this.getMousePosition();
+            dragFromX = pos.x;
+            dragFromY = pos.y;
+        }
+        dragging = true;
     }//GEN-LAST:event_formMouseDragged
+
+    private void formMouseMoved(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_formMouseMoved
+        // write tooltip info
+        Point pos = this.getMousePosition();
+        if (pos != null) {
+            this.setToolTipText(Ampter.freqInfo(Ampter.pixToFreq(pos.y)));
+        }
+    }//GEN-LAST:event_formMouseMoved
+
+    private void formMouseReleased(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_formMouseReleased
+        dragging = false;
+        dragFromX = 0;
+        dragFromY = 0;
+    }//GEN-LAST:event_formMouseReleased
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     // End of variables declaration//GEN-END:variables
