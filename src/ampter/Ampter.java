@@ -20,7 +20,8 @@ public class Ampter extends javax.swing.JFrame {
     static boolean playing = false;
     static boolean audioLoaded = false;
     static boolean ef_selected = false;
-    static int headPos = 0;
+    static boolean fullCircle = false;
+    static int headPos = 0; // playhead position in terms of absolute pixels
     static int bl_size = 0;
     static int sample_rate = 0;
     static int num_frames = 0;
@@ -28,8 +29,17 @@ public class Ampter extends javax.swing.JFrame {
     JViewport vPort;
     static int viewLeft = 0; // scrollpane left
     static int viewRight = 0; // scrollpane right
+    static int realWidth = 0;
     static int viewHeight = 0; // scrollpane height
-    static int ppb = 50; // pixels per block
+    static int ppb = 100; // pixels per block
+
+    public static boolean isFullCircle() {
+        return fullCircle;
+    }
+
+    public static void setFullCircle(boolean fullCircle) {
+        Ampter.fullCircle = fullCircle;
+    }
 
     public static int getPpb() {
         return ppb;
@@ -108,6 +118,7 @@ public class Ampter extends javax.swing.JFrame {
      */
     // create thread for jep (jep python can't multithread)
     Thread pyThread = new Thread(new PyLink());
+    Thread realThread;
 
     public Ampter() {
         // prevents weird locale error
@@ -126,17 +137,22 @@ public class Ampter extends javax.swing.JFrame {
         vPort = viewport1.getViewport();
         vPort.addChangeListener(new ChangeListener() {
             public void stateChanged(ChangeEvent evt) {
-                viewportChangePerformed(evt);
+                viewportChangePerformed();
             }
         });
-        realport1.setSize(8000, 750);
+        realThread = new Thread(realport1);
+        realThread.start();
     }
 
-    public void viewportChangePerformed(ChangeEvent evt) {
+    public void viewportChangePerformed() {
         Rectangle rect = vPort.getViewRect();
         viewLeft = rect.x;
         viewRight = viewLeft + rect.width;
+        realWidth = num_bl * ppb;
         viewHeight = rect.height;
+        realport1.setPreferredSize(new Dimension(realWidth, viewHeight));
+        viewport1.revalidate();
+//        System.out.println("" + viewLeft + " " + viewRight + " " + realWidth + " " + viewHeight);
     }
 
     /**
@@ -187,6 +203,11 @@ public class Ampter extends javax.swing.JFrame {
         setBackground(new java.awt.Color(0, 0, 0));
         setCursor(new java.awt.Cursor(java.awt.Cursor.DEFAULT_CURSOR));
         setPreferredSize(new java.awt.Dimension(1000, 750));
+        addKeyListener(new java.awt.event.KeyAdapter() {
+            public void keyTyped(java.awt.event.KeyEvent evt) {
+                formKeyTyped(evt);
+            }
+        });
 
         leftPanel.setBackground(new java.awt.Color(153, 153, 153));
         leftPanel.setPreferredSize(new java.awt.Dimension(200, 701));
@@ -442,7 +463,7 @@ public class Ampter extends javax.swing.JFrame {
         if (returnVal != JFileChooser.APPROVE_OPTION) {
             return;
         }
-        PyLink.q.add(new Object[]{PyCalls.LOAD_AUDIO, chooseFiles.getSelectedFile().getPath(), realport1, this.getHeight()});
+        PyLink.q.add(new Object[]{PyCalls.LOAD_AUDIO, chooseFiles.getSelectedFile().getPath(), this});
         stockList.setEnabled(true);
         loadVSTButton.setEnabled(true);
         sizeSlider.setEnabled(true);
@@ -481,8 +502,12 @@ public class Ampter extends javax.swing.JFrame {
         if (returnVal != JFileChooser.APPROVE_OPTION) {
             return;
         }
-        PyLink.q.add(new Object[]{PyCalls.METHOD, "save_song", chooseFiles.getSelectedFile()});
+        PyLink.q.add(new Object[]{PyCalls.METHOD, "save_song", chooseFiles.getSelectedFile().toString()});
     }//GEN-LAST:event_saveAudioActionPerformed
+
+    private void formKeyTyped(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_formKeyTyped
+        // TODO add your handling code here:
+    }//GEN-LAST:event_formKeyTyped
 
     /**
      * @param args the command line arguments

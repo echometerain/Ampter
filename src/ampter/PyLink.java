@@ -22,18 +22,22 @@ public class PyLink implements Runnable {
     static SharedInterpreter interp; // python interpreter
     static int delta = 25; // backend processing latency
     static int pointer = 0; // pointer which draws spectrogram blocks
-    int lastViewLeft = 0;
 
     // go to nearest unloaded block and calculate its spectrogram
     public void writeSpec() {
-        // adjust write pointer when viewport is scrolled left
-        int vLeft = Ampter.getViewLeft();
-        if (vLeft < lastViewLeft) {
-            pointer = vLeft / Ampter.ppb;
+        if (Ampter.isFullCircle()) {
+            return;
         }
+        // horribly inefficient but works
+        pointer = Ampter.getViewLeft() / Ampter.ppb;
+        int origin = pointer;
         // skip written blocks
         while (Ampter.specs[0][pointer] != null) {
             pointer++;
+            if (pointer == origin) {
+                Ampter.setFullCircle(true);
+                return;
+            }
             // loop around if at end
             if (pointer >= Ampter.num_bl) {
                 pointer = 0;
@@ -64,10 +68,7 @@ public class PyLink implements Runnable {
                 interp.invoke("set_song", args[1]);
                 Ampter.setSpecs(new BufferedImage[2][Ampter.getSample_rate()]);
                 Ampter.setAudioLoaded(true);
-                System.out.println(Ampter.getNum_bl() * Ampter.getPpb());
-                ((Realport) args[2]).setSize(Ampter.getNum_bl() * Ampter.getPpb(), (int) (args[3]));
-                System.out.println(((Realport) args[2]).getSize());
-
+                ((Ampter) args[2]).viewportChangePerformed();
                 break;
         }
     }

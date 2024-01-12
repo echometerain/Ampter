@@ -6,12 +6,16 @@ package ampter;
 
 import javax.swing.*;
 import java.awt.*;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  *
  * @author hhwl
  */
-public class Realport extends javax.swing.JPanel {
+public class Realport extends javax.swing.JPanel implements Runnable {
+
+    static int delta = 25;
 
     /**
      * Creates new form Realport
@@ -22,10 +26,39 @@ public class Realport extends javax.swing.JPanel {
 
     public void paintComponent(Graphics g) {
         super.paintComponent(g);
+        if (!Ampter.isAudioLoaded()) {
+            return;
+        }
+        int ppb = Ampter.getPpb();
+        int leftBlock = Ampter.getViewLeft() / ppb - 2;
+        int rightBlock = Ampter.getViewRight() / ppb + 2;
+        if (leftBlock < 0) {
+            leftBlock = 0;
+        }
+        if (rightBlock >= Ampter.num_bl) {
+            rightBlock = Ampter.num_bl;
+        }
+        int viewHeight = Ampter.getViewHeight();
+        for (int i = leftBlock; i <= rightBlock; i++) {
+            if (Ampter.specs[0][i] != null) {
+                g.drawImage(Ampter.specs[0][i], i * ppb, 0, ppb, viewHeight, this);
+            }
+            if (Ampter.specs[1][i] != null) {
+                g.drawImage(Ampter.specs[1][i], i * ppb, 0, ppb, viewHeight, this);
+            }
+        }
     }
 
-    public void update() {
-
+    public void run() {
+        while (true) {
+            repaint();
+            try {
+                // sleep for delta ms if nothing to do
+                Thread.sleep(delta);
+            } catch (InterruptedException ex) {
+                Logger.getLogger(Realport.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }
     }
 
     /**
@@ -38,6 +71,11 @@ public class Realport extends javax.swing.JPanel {
     private void initComponents() {
 
         setBackground(new java.awt.Color(0, 0, 0));
+        addMouseMotionListener(new java.awt.event.MouseMotionAdapter() {
+            public void mouseDragged(java.awt.event.MouseEvent evt) {
+                formMouseDragged(evt);
+            }
+        });
 
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(this);
         this.setLayout(layout);
@@ -50,6 +88,10 @@ public class Realport extends javax.swing.JPanel {
             .addGap(0, 300, Short.MAX_VALUE)
         );
     }// </editor-fold>//GEN-END:initComponents
+
+    private void formMouseDragged(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_formMouseDragged
+        // TODO add your handling code here:
+    }//GEN-LAST:event_formMouseDragged
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     // End of variables declaration//GEN-END:variables

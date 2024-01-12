@@ -1,17 +1,21 @@
+import matplotlib.style as mplstyle
 from ampter import Ampter  # type: ignore
 import pyaudio
 from pedalboard.io import AudioFile as AF
 import pedalboard as pb
 from PIL import Image
-import base64
 import math
 import io
 from matplotlib import pyplot as plt
 import numpy as np
 import librosa as lr
 import librosa.display as lrdp
+# improve single threaded performance
 import matplotlib
 matplotlib.use('Agg')
+# improve performance
+# https://matplotlib.org/stable/users/explain/artists/performance.html
+mplstyle.use('fast')
 
 
 # array of functions
@@ -135,12 +139,12 @@ def calc_spec(block_pos, channel):  # channel ∈ [0,1]
     block = song[channel][block_pos*bl_size:(block_pos+1) * bl_size]
     # calculate spectrogram
     spec_num = lr.feature.melspectrogram(
-        y=block, sr=sample_rate, n_fft=2048, hop_length=128)
+        y=block, sr=sample_rate, n_fft=2048, hop_length=512)
     # fmax=sample_rate//2 if sample_rate <= 48000 else 24000
 
     # render spectrogram
     lrdp.specshow(lr.power_to_db(spec_num, top_db=100), x_axis='time',
-                  y_axis='mel', sr=sample_rate, ax=ax)  # , shading='gouraud', cmap=plt.colormaps['magma'])
+                  y_axis='mel', sr=sample_rate, ax=ax, cmap=plt.colormaps['magma'])
     # plt.show()
 
     # save in memory
