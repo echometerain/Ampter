@@ -19,7 +19,7 @@ mplstyle.use('fast')
 
 
 # array of functions that makes stock plugins
-stock_list = [pb.Gain, pb.Bitcrush, pb.Chorus, pb.Clipping, pb.Compressor,
+stock_list = [pb.Gain, pb.Bitcrush, pb.Chorus, pb.Clipping, pb.Compressor, pb.MP3Compressor,
               pb.Delay, pb.Distortion, pb.Reverb, pb.PitchShift, pb.Phaser, pb.NoiseGate]
 bl_freq = 4                 # width of block in hertz
 hop_len = 256               # spectrogram hop length
@@ -55,6 +55,7 @@ def set_song(path):  # returns true if successful
         Ampter.setBl_size(bl_size)
         Ampter.setNum_frames(num_frames)
         Ampter.setNum_bl(num_bl)
+        Ampter.setBl_freq(bl_freq)
 
         # make array that holds song
         song = np.empty([2, num_frames], np.float32)
@@ -96,7 +97,8 @@ def set_stock_effect(type, args):
     ef_selected = True
     is_vst = False
     # call effect from stock list
-    effect = stock_list[type](*args)
+    effect = stock_list[type](**args)
+    # print(effect)
 
 # load effect from VST3 path
 
@@ -151,7 +153,7 @@ def calc_spec(block_pos, channel):  # channel ∈ [0,1]
     block = song[channel][start:end]
     # calculate spectrogram
     spec_num = lr.feature.melspectrogram(
-        y=block, sr=sample_rate, n_fft=2048, hop_length=hop_len)
+        y=block, sr=sample_rate, n_fft=2048, fmax=sample_rate//2, hop_length=hop_len)
     # render spectrogram
     lrdp.specshow(lr.power_to_db(spec_num, top_db=100), x_axis='time',
                   y_axis='mel', sr=sample_rate, ax=ax, cmap=plt.colormaps['magma'])
@@ -180,6 +182,7 @@ def second_order_allpass_filter(freq, BW):
     return b, a
 
 # paint using brush
+# from wolfsound's tutorial: https://youtu.be/wodumxEF9u0
 # Q makes bandwidth appear constant on log scales
 # y denotes frequency so exp(y-coord) must be used
 
