@@ -38,6 +38,8 @@ public class Ampter extends javax.swing.JFrame {
 	static int realWidth = 0; // actual width of the edit region (realport1)
 	static int viewHeight = 0; // scrollpane height
 	static int ppb = 100; // pixels per block
+	static int ppbIncrement = 25;
+	static boolean shiftHeld = false;
 
 	// getter setters spam
 	public double getLeftSliderLevel() {
@@ -212,13 +214,22 @@ public class Ampter extends javax.swing.JFrame {
 		// adding realport manually cause the gui builder crashed lol
 		viewport1.add(realport1);
 		viewport1.setViewportView(realport1);
+		for (var e : viewport1.getMouseWheelListeners()) {
+			viewport1.removeMouseWheelListener(e);
+		}
+		viewport1.addMouseWheelListener(new java.awt.event.MouseWheelListener() {
+			public void mouseWheelMoved(java.awt.event.MouseWheelEvent evt) {
+				viewport1MouseWheelMoved(evt);
+			}
+		});
+
 		realThread = new Thread(realport1);
 		realThread.start();
 
 		// not in the gui builder for some reason
 		stockList.addListSelectionListener(this::listValueChanged);
 		// write every stock plugin into the array
-		stockPlugin.init(stocks);
+		stockPlugin.init(stocks, this);
 	}
 
 	// get new positions for viewable region when dimensions change
@@ -229,6 +240,7 @@ public class Ampter extends javax.swing.JFrame {
 		realWidth = num_bl * ppb;
 		viewHeight = rect.height;
 		realport1.setPreferredSize(new Dimension(realWidth, viewHeight));
+		realport1.revalidate();
 		viewport1.revalidate();
 //        System.out.println("" + viewLeft + " " + viewRight + " " + realWidth + " " + viewHeight);
 	}
@@ -246,6 +258,71 @@ public class Ampter extends javax.swing.JFrame {
 		stocks[selected].givePy();
 		ef_selected = true;
 
+	}
+
+	private void viewport1MouseWheelMoved(java.awt.event.MouseWheelEvent evt) {
+		int rotUnits = evt.getWheelRotation();
+		boolean forward = true;
+		if (rotUnits < 0) {
+			rotUnits = Math.abs(rotUnits);
+			forward = false;
+		}
+		if (shiftHeld) {
+			stretchSqeeze(forward);
+		} else {
+			shiftPos(forward);
+		}
+
+	}
+
+	public void playPauseHandle() {
+		// play and pause
+		if (playing) {
+			playing = false;
+		} else {
+			playing = true;
+			PyLink.q.add(new Object[]{PyCalls.METHOD, "play", (int) (((double) headPos) / ppb * bl_size)});
+		}
+	}
+
+	public void shiftPos(boolean forward) {
+		// shift forwards or backwards by 1 second
+		int dir = 1;
+		if (!forward) {
+			dir = -1;
+		}
+		int tmpLeft = viewLeft + dir * bl_freq * ppb;
+		int tmpRight = viewRight + dir * bl_freq * ppb;
+		if (tmpLeft < 0 || tmpRight > realWidth) {
+			return;
+		}
+		viewLeft = tmpLeft;
+		viewRight = tmpRight;
+		viewport1.getViewport().setViewPosition(new Point(viewLeft, 0));
+	}
+
+	public void gotoPos(int pos) {
+		// pos in pixels
+		if (pos < 0 || pos > realWidth) {
+			return;
+		}
+		viewRight = pos + viewRight - viewLeft;
+		viewLeft = pos;
+		viewport1.getViewport().setViewPosition(new Point(viewLeft, 0));
+	}
+
+	public void stretchSqeeze(boolean stretch) {
+		int dir = 1;
+		if (!stretch) {
+			dir = -1;
+		}
+		int tmpPpb = ppb + dir * ppbIncrement;
+		if (tmpPpb <= 0) {
+			return;
+		}
+		headPos = (int) (headPos / ((double) ppb) * tmpPpb);
+		ppb = tmpPpb;
+		viewportChangePerformed(null);
 	}
 
 	/**
@@ -300,6 +377,9 @@ public class Ampter extends javax.swing.JFrame {
             public void keyPressed(java.awt.event.KeyEvent evt) {
                 formKeyPressed(evt);
             }
+            public void keyReleased(java.awt.event.KeyEvent evt) {
+                formKeyReleased(evt);
+            }
         });
 
         leftPanel.setBackground(new java.awt.Color(153, 153, 153));
@@ -333,6 +413,7 @@ public class Ampter extends javax.swing.JFrame {
 
         stockScroll.setPreferredSize(new java.awt.Dimension(175, 175));
 
+        stockOptions.setFocusable(false);
         stockOptions.setMaximumSize(new java.awt.Dimension(175, 32767));
         stockOptions.setMinimumSize(new java.awt.Dimension(175, 10));
         stockOptions.setPreferredSize(new java.awt.Dimension(150, 100));
@@ -540,6 +621,10 @@ public class Ampter extends javax.swing.JFrame {
 		// disable stock effect
 		stockList.setSelectedIndex(-1);
 		stockList.setSelectedValue(null, false);
+
+		stockOptions.removeAll();
+		stockOptions.revalidate();
+		stockOptions.repaint();
 		stockList.validate();
 		ef_selected = true;
     }//GEN-LAST:event_loadVSTButtonActionPerformed
@@ -572,25 +657,23 @@ public class Ampter extends javax.swing.JFrame {
     }//GEN-LAST:event_loadAudioActionPerformed
 
     private void playPauseActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_playPauseActionPerformed
-		// play and pause
-		if (playing) {
-			playing = false;
-		} else {
-			playing = true;
-			PyLink.q.add(new Object[]{PyCalls.METHOD, "play", (int) (((double) headPos) / ppb * bl_size)});
-		}
+		playPauseHandle();
     }//GEN-LAST:event_playPauseActionPerformed
 
     private void shiftForwardActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_shiftForwardActionPerformed
-		// TODO add your handling code here:
+		shiftPos(true);
     }//GEN-LAST:event_shiftForwardActionPerformed
 
     private void stopResetActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_stopResetActionPerformed
-		// TODO add your handling code here:
+		gotoPos(0);
+		if (playing) {
+			playPauseHandle();
+		}
+		headPos = 0;
     }//GEN-LAST:event_stopResetActionPerformed
 
     private void shiftBackActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_shiftBackActionPerformed
-		// TODO add your handling code here:
+		shiftPos(false);
     }//GEN-LAST:event_shiftBackActionPerformed
 
     private void saveAudioActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_saveAudioActionPerformed
@@ -606,11 +689,27 @@ public class Ampter extends javax.swing.JFrame {
 		// play audio with space
 		switch (evt.getKeyCode()) {
 			case KeyEvent.VK_SPACE:
-				// hacky but works
-				playPauseActionPerformed(null);
+				playPauseHandle();
+				break;
+			case KeyEvent.VK_RIGHT:
+				shiftPos(true);
+				break;
+			case KeyEvent.VK_LEFT:
+				shiftPos(false);
+				break;
+			case KeyEvent.VK_SHIFT:
+				shiftHeld = true;
 				break;
 		}
     }//GEN-LAST:event_formKeyPressed
+
+    private void formKeyReleased(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_formKeyReleased
+		switch (evt.getKeyCode()) {
+			case KeyEvent.VK_SHIFT:
+				shiftHeld = false;
+				break;
+		}
+    }//GEN-LAST:event_formKeyReleased
 
 	/**
 	 * @param args the command line arguments

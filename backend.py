@@ -188,6 +188,9 @@ def second_order_allpass_filter(freq, BW):
 
 
 def paint(ax, ay, bx, by, Q, channel, wet):  # wet ∈ [0,1]
+    if ax == ay or by == 0:
+        return
+
     unfiltered = song[channel][ax:bx]
     filtered = np.zeros(bx-ax)
     x1 = 0

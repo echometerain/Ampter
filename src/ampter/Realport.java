@@ -46,7 +46,7 @@ public class Realport extends javax.swing.JPanel implements Runnable {
 		int ppb = Ampter.getPpb();
 		int num_bl = Ampter.getNum_bl();
 		int leftBlock = Math.max(Ampter.getViewLeft() / ppb - 2, 0); // -2 & +2 for smooth scrolling
-		int rightBlock = Math.min(Ampter.getViewRight() / ppb + 2, num_bl);
+		int rightBlock = Math.min(Ampter.getViewRight() / ppb + 2, num_bl - 1);
 		int viewHeight = Ampter.getViewHeight();
 		BufferedImage[][] specs = Ampter.getSpecs();
 		// swing needs me to do this for some reason
@@ -64,7 +64,11 @@ public class Realport extends javax.swing.JPanel implements Runnable {
 		}
 
 		boolean playing = Ampter.isPlaying();
+		int headPos = Ampter.getHeadPos();
 		if (playing && !wasPlaying) {
+			if (headPos < Ampter.viewLeft || headPos > Ampter.viewRight) {
+				parent.gotoPos(headPos);
+			}
 			wasPlaying = true;
 			startTime = System.nanoTime();
 		}
@@ -76,9 +80,12 @@ public class Realport extends javax.swing.JPanel implements Runnable {
 		// draw playhead
 		g2.setStroke(new BasicStroke(4));
 		g.setColor(Color.white);
-		int headPos = Ampter.getHeadPos();
 		if (playing) {
 			headPos += (int) ((System.nanoTime() - startTime) / 1000000000.0 * Ampter.getBl_freq() * ppb);
+		}
+
+		if (headPos > Ampter.viewRight) {
+			parent.gotoPos(Ampter.viewRight);
 		}
 		g.drawLine(headPos, 0, headPos, viewHeight);
 
@@ -86,7 +93,7 @@ public class Realport extends javax.swing.JPanel implements Runnable {
 		Point pos = this.getMousePosition();
 		if (dragging && pos != null) {
 			g.setColor(new Color(0, 0, 255, 128));
-			int stroke = (int) (10 * parent.getSizeSliderLevel());
+			int stroke = (int) (Ampter.getViewHeight() / 50.0 * parent.getSizeSliderLevel());
 			Polygon p = new Polygon();
 			p.addPoint(dragFromX, dragFromY - stroke);
 			p.addPoint(dragFromX, dragFromY + stroke);
@@ -103,10 +110,10 @@ public class Realport extends javax.swing.JPanel implements Runnable {
 		while (true) {
 			// redraw every frame
 			repaint();
-			Point pos = this.getMousePosition();
-			if (pos != null) {
-				System.out.println(pos.x + " " + pos.y + " " + Ampter.getViewHeight());
-			}
+//			Point pos = this.getMousePosition();
+//			if (pos != null) {
+//				System.out.println(pos.x + " " + pos.y + " " + Ampter.getViewHeight());
+//			}
 			try {
 				// frame pause
 				Thread.sleep(delta);
@@ -179,7 +186,11 @@ public class Realport extends javax.swing.JPanel implements Runnable {
 		Point pos = this.getMousePosition();
 		if (dragging && pos != null) {
 			// call python paint
-			PyLink.q.add(new Object[]{PyCalls.PAINT, dragFromX, dragFromY, pos.x, pos.y});
+			if (pos.x < dragFromX) {
+				PyLink.q.add(new Object[]{PyCalls.PAINT, pos.x, pos.y, dragFromX, dragFromY});
+			} else {
+				PyLink.q.add(new Object[]{PyCalls.PAINT, dragFromX, dragFromY, pos.x, pos.y});
+			}
 			dragging = false;
 			dragFromX = 0;
 			dragFromY = 0;

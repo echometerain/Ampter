@@ -7,6 +7,8 @@ package ampter;
 import java.util.*;
 import javax.swing.*;
 import javax.swing.event.*;
+import javax.swing.JSpinner.*;
+import java.awt.event.*;
 
 /**
  *
@@ -15,10 +17,12 @@ import javax.swing.event.*;
 public class stockPlugin {
 
 	int index;
+	Ampter source;
 	HashMap<String, double[]> settings = new HashMap<>(); // [min, value, max]
 
-	public stockPlugin(int index) {
+	public stockPlugin(int index, Ampter source) {
 		this.index = index;
+		this.source = source;
 	}
 
 	public void changeVal(String st, int val) {
@@ -45,9 +49,9 @@ public class stockPlugin {
 		p.removeAll();
 		for (String e : settings.keySet()) {
 			JLabel name = new javax.swing.JLabel();
-			name.setMaximumSize(new java.awt.Dimension(84, 20));
-			name.setMinimumSize(new java.awt.Dimension(84, 20));
-			name.setPreferredSize(new java.awt.Dimension(84, 20));
+			name.setMaximumSize(new java.awt.Dimension(80, 20));
+			name.setMinimumSize(new java.awt.Dimension(80, 20));
+			name.setPreferredSize(new java.awt.Dimension(80, 20));
 			name.setText(e);
 			name.setToolTipText(e);
 			p.add(name);
@@ -56,15 +60,49 @@ public class stockPlugin {
 			double[] arr = settings.get(e);
 			SpinnerNumberModel model = new SpinnerNumberModel(arr[1], arr[0], arr[2], 0.5);
 			chooser.setModel(model);
-			chooser.setMaximumSize(new java.awt.Dimension(60, 20));
-			chooser.setMinimumSize(new java.awt.Dimension(60, 20));
-			chooser.setPreferredSize(new java.awt.Dimension(60, 20));
+			chooser.setEditor(new CustomNumberEditor(chooser, "0.0"));
+			chooser.setMaximumSize(new java.awt.Dimension(80, 20));
+			chooser.setMinimumSize(new java.awt.Dimension(80, 20));
+			chooser.setPreferredSize(new java.awt.Dimension(80, 20));
 			chooser.addChangeListener(new valueChange(this, e));
 			chooser.setFocusable(false);
 			p.add(chooser);
 		}
 		p.revalidate();
 		p.repaint();
+	}
+
+	// based on https://stackoverflow.com/questions/15277349/jspinner-does-not-transfer-focus-when-pressing-enter
+	class CustomNumberEditor extends NumberEditor implements KeyListener {
+
+		private final JFormattedTextField textField;
+
+		public CustomNumberEditor(JSpinner spinner, String formatString) {
+			super(spinner, formatString);
+			textField = getTextField();
+			textField.addKeyListener(this);
+		}
+
+		@Override
+		public void keyTyped(KeyEvent e) {
+		}
+
+		@Override
+		public void keyPressed(KeyEvent e) {
+			switch (e.getKeyCode()) {
+				case KeyEvent.VK_ENTER:
+					source.requestFocus();
+					break;
+				case KeyEvent.VK_SPACE:
+					source.requestFocus();
+					source.playPauseHandle();
+					break;
+			}
+		}
+
+		@Override
+		public void keyReleased(KeyEvent e) {
+		}
 	}
 
 	public class valueChange implements ChangeListener {
@@ -85,16 +123,16 @@ public class stockPlugin {
 		}
 	}
 
-	public static void init(stockPlugin[] stocks) {
+	public static void init(stockPlugin[] stocks, Ampter source) {
 		double dMax = Double.MAX_VALUE;
 		double dMin = -Double.MAX_VALUE;
 		for (int i = 0; i < 12; i++) {
-			stocks[i] = new stockPlugin(i);
+			stocks[i] = new stockPlugin(i, source);
 		}
 
 		// write [min, value, max] according to https://spotify.github.io/pedalboard/reference/pedalboard.html
 		HashMap<String, double[]> gain = new HashMap<>();
-		gain.put("gain_db", new double[]{dMin, 1, dMax});
+		gain.put("gain_db", new double[]{0, 1, dMax});
 		HashMap<String, double[]> bitcrush = new HashMap<>();
 		bitcrush.put("bit_depth", new double[]{0, 1, 32});
 		HashMap<String, double[]> chorus = new HashMap<>();

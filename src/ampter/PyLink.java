@@ -90,7 +90,7 @@ public class PyLink implements Runnable {
 				double y1Real = Ampter.pixToFreq(y1);
 				int x2Real = x2 / Ampter.ppb * Ampter.bl_size;
 				double y2Real = Ampter.pixToFreq(y2);
-				double Q = parent.getSizeSliderLevel();
+				double Q = 11.0 - parent.getSizeSliderLevel();
 				interp.invoke("paint", new Object[]{x1Real, y1Real, x2Real, y2Real, Q, 0, parent.getLeftSliderLevel()});
 				interp.invoke("paint", new Object[]{x1Real, y1Real, x2Real, y2Real, Q, 1, parent.getRightSliderLevel()});
 
