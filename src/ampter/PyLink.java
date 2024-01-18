@@ -18,9 +18,10 @@ import java.util.logging.*;
 // python interface singleton
 public class PyLink implements Runnable {
 
-	static Queue<Object[]> q = new LinkedList<>(); // py command queue
+	static final int DELTA = 25; // backend processing latency
+	static final Queue<Object[]> q = new LinkedList<>(); // py command queue
+
 	static SharedInterpreter interp; // python interpreter
-	static int delta = 25; // backend processing latency
 	static int pointer = 0; // pointer which draws spectrogram blocks
 	static Ampter parent;
 
@@ -33,15 +34,16 @@ public class PyLink implements Runnable {
 		if (Ampter.isFullCircle()) {
 			return;
 		}
-		// horribly inefficient but works
 		pointer = Ampter.getViewLeft() / Ampter.ppb;
 		int origin = pointer;
 		BufferedImage[][] specs = Ampter.getSpecs();
 		int num_bl = Ampter.getNum_bl();
 
-		// skip written blocks
+		// horribly inefficient but works
+		// writes at the first block without a spectrogram
 		while (specs[0][pointer] != null) {
 			pointer = (pointer + 1) % num_bl;
+			// check if pointer has gone full circle
 			if (pointer == origin) {
 				Ampter.setFullCircle(true);
 				return;
@@ -50,6 +52,8 @@ public class PyLink implements Runnable {
 		// get spec data from python
 		byte[] data;
 		try {
+			// reads python image bytes into java image
+			// thank god this works
 			data = (byte[]) interp.invoke("calc_spec", pointer, 0);
 			specs[0][pointer] = ImageIO.read(new ByteArrayInputStream(data));
 			data = (byte[]) interp.invoke("calc_spec", pointer, 1);
@@ -72,29 +76,41 @@ public class PyLink implements Runnable {
 				break;
 			case LOAD_AUDIO:
 				interp.invoke("set_song", args[1]);
+				// re-create spectrogram array
 				Ampter.setSpecs(new BufferedImage[2][Ampter.getNum_bl()]);
 				Ampter.setAudioLoaded(true);
 				// redraw realport
 				((Ampter) args[2]).viewportChangePerformed(null);
 				break;
 			case PAINT:
+				// do nothing if no effect selected
 				if (!Ampter.isEf_selected()) {
 					break;
 				}
+				// set up variables
 				int x1 = (int) args[1];
 				int y1 = (int) args[2];
 				int x2 = (int) args[3];
 				int y2 = (int) args[4];
 				BufferedImage[][] specs = Ampter.getSpecs();
+
+				// get location in frequencies and audio frames
 				int x1Real = x1 / Ampter.ppb * Ampter.bl_size;
 				double y1Real = Ampter.pixToFreq(y1);
 				int x2Real = x2 / Ampter.ppb * Ampter.bl_size;
 				double y2Real = Ampter.pixToFreq(y2);
+
+				// using 11.0 (getSizeSliderLevel() <= 10) here to prevent division by zero
+				// sorry for the magic number I have no idea how to name it
 				double Q = 11.0 - parent.getSizeSliderLevel();
+
+				// tell python to paint
 				interp.invoke("paint", new Object[]{x1Real, y1Real, x2Real, y2Real, Q, 0, parent.getLeftSliderLevel()});
 				interp.invoke("paint", new Object[]{x1Real, y1Real, x2Real, y2Real, Q, 1, parent.getRightSliderLevel()});
 
+				// there are still more specs to draw!!!
 				Ampter.setFullCircle(false);
+				// remove outdated specs on painted area
 				for (int i = x1 / Ampter.ppb; i <= x2 / Ampter.ppb; i++) {
 					specs[0][i] = null;
 					specs[1][i] = null;
@@ -117,7 +133,7 @@ public class PyLink implements Runnable {
 		while (true) {
 			// sleep for delta ms
 			try {
-				Thread.sleep(delta);
+				Thread.sleep(DELTA);
 			} catch (InterruptedException ex) {
 				ex.printStackTrace();
 				Logger.getLogger(PyLink.class.getName()).log(Level.SEVERE, null, ex);

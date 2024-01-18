@@ -17,116 +17,20 @@ import java.awt.event.*;
 public class stockPlugin {
 
 	int index;
-	Ampter source;
-	HashMap<String, double[]> settings = new HashMap<>(); // [min, value, max]
+	Ampter source; // for calling non-static functions
+	HashMap<String, double[]> settings; // [min, value, max]
 
+	// the index of the plugin in stocks[]
 	public stockPlugin(int index, Ampter source) {
 		this.index = index;
 		this.source = source;
 	}
 
-	public void changeVal(String st, int val) {
-		settings.get(st)[1] = val;
-	}
-
-	public void setSettings(HashMap<String, double[]> settings) {
-		this.settings = settings;
-	}
-
-	public HashMap<String, double[]> getSettings() {
-		return settings;
-	}
-
-	public void givePy() {
-		HashMap<String, Object> temp = new HashMap<>();
-		for (String e : settings.keySet()) {
-			temp.put(e, settings.get(e)[1]);
-		}
-		PyLink.q.add(new Object[]{PyCalls.METHOD, "set_stock_effect", index, temp});
-	}
-
-	public void buildPanel(JPanel p) {
-		p.removeAll();
-		for (String e : settings.keySet()) {
-			JLabel name = new javax.swing.JLabel();
-			name.setMaximumSize(new java.awt.Dimension(80, 20));
-			name.setMinimumSize(new java.awt.Dimension(80, 20));
-			name.setPreferredSize(new java.awt.Dimension(80, 20));
-			name.setText(e);
-			name.setToolTipText(e);
-			p.add(name);
-
-			JSpinner chooser = new javax.swing.JSpinner();
-			double[] arr = settings.get(e);
-			SpinnerNumberModel model = new SpinnerNumberModel(arr[1], arr[0], arr[2], 0.5);
-			chooser.setModel(model);
-			chooser.setEditor(new CustomNumberEditor(chooser, "0.0"));
-			chooser.setMaximumSize(new java.awt.Dimension(80, 20));
-			chooser.setMinimumSize(new java.awt.Dimension(80, 20));
-			chooser.setPreferredSize(new java.awt.Dimension(80, 20));
-			chooser.addChangeListener(new valueChange(this, e));
-			chooser.setFocusable(false);
-			p.add(chooser);
-		}
-		p.revalidate();
-		p.repaint();
-	}
-
-	// based on https://stackoverflow.com/questions/15277349/jspinner-does-not-transfer-focus-when-pressing-enter
-	class CustomNumberEditor extends NumberEditor implements KeyListener {
-
-		private final JFormattedTextField textField;
-
-		public CustomNumberEditor(JSpinner spinner, String formatString) {
-			super(spinner, formatString);
-			textField = getTextField();
-			textField.addKeyListener(this);
-		}
-
-		@Override
-		public void keyTyped(KeyEvent e) {
-		}
-
-		@Override
-		public void keyPressed(KeyEvent e) {
-			switch (e.getKeyCode()) {
-				case KeyEvent.VK_ENTER:
-					source.requestFocus();
-					break;
-				case KeyEvent.VK_SPACE:
-					source.requestFocus();
-					source.playPauseHandle();
-					break;
-			}
-		}
-
-		@Override
-		public void keyReleased(KeyEvent e) {
-		}
-	}
-
-	public class valueChange implements ChangeListener {
-
-		stockPlugin stock;
-		String settingName;
-
-		public valueChange(stockPlugin stock, String settingName) {
-			this.stock = stock;
-			this.settingName = settingName;
-		}
-
-		@Override
-		public void stateChanged(ChangeEvent e) {
-			double[] arr = stock.getSettings().get(settingName);
-			arr[1] = (double) (((JSpinner) e.getSource()).getValue());
-			stock.givePy();
-		}
-	}
-
+	// make all the stock plugins
 	public static void init(stockPlugin[] stocks, Ampter source) {
 		double dMax = Double.MAX_VALUE;
 		double dMin = -Double.MAX_VALUE;
-		for (int i = 0; i < 12; i++) {
+		for (int i = 0; i < Ampter.NUM_STOCKS; i++) {
 			stocks[i] = new stockPlugin(i, source);
 		}
 
@@ -190,6 +94,114 @@ public class stockPlugin {
 		stocks[9].setSettings(pitchShift);
 		stocks[10].setSettings(phaser);
 		stocks[11].setSettings(noiseGate);
+	}
 
+	// change specific setting value
+	public void changeVal(String st, double val) {
+		settings.get(st)[1] = val;
+	}
+
+	// settings getter setters
+	public void setSettings(HashMap<String, double[]> settings) {
+		this.settings = settings;
+	}
+
+	public HashMap<String, double[]> getSettings() {
+		return settings;
+	}
+
+	// give effect settings to python
+	public void givePy() {
+		// python will only accept the values, not the max or min
+		HashMap<String, Object> temp = new HashMap<>();
+		for (String e : settings.keySet()) {
+			temp.put(e, settings.get(e)[1]);
+		}
+		PyLink.q.add(new Object[]{PyCalls.METHOD, "set_stock_effect", index, temp});
+	}
+
+	// make a label and spinner for each setting
+	public void buildPanel(JPanel p) {
+		// remove all previous components
+		p.removeAll();
+		for (String e : settings.keySet()) {
+			JLabel name = new javax.swing.JLabel();
+			name.setMaximumSize(new java.awt.Dimension(80, 20));
+			name.setMinimumSize(new java.awt.Dimension(80, 20));
+			name.setPreferredSize(new java.awt.Dimension(80, 20));
+			name.setText(e);
+			name.setToolTipText(e); // in case text gets cut off
+			p.add(name);
+
+			JSpinner chooser = new javax.swing.JSpinner();
+			double[] arr = settings.get(e);
+			// I didn't look at the SpinnerNumberModel schema when making init() lol
+			SpinnerNumberModel model = new SpinnerNumberModel(arr[1], arr[0], arr[2], 0.5);
+			chooser.setModel(model);
+			chooser.setEditor(new CustomNumberEditor(chooser, "0.0"));
+			chooser.setMaximumSize(new java.awt.Dimension(80, 20));
+			chooser.setMinimumSize(new java.awt.Dimension(80, 20));
+			chooser.setPreferredSize(new java.awt.Dimension(80, 20));
+			chooser.addChangeListener(new valueChange(this, e));
+			chooser.setFocusable(false); // probably doesn't work
+			p.add(chooser);
+		}
+		p.revalidate();
+		p.repaint();
+	}
+
+	// prevents spinner from eating my shortcuts
+	// based on https://stackoverflow.com/questions/15277349/jspinner-does-not-transfer-focus-when-pressing-enter
+	class CustomNumberEditor extends NumberEditor implements KeyListener {
+
+		private final JFormattedTextField textField;
+
+		public CustomNumberEditor(JSpinner spinner, String formatString) {
+			super(spinner, formatString);
+			textField = getTextField();
+			textField.addKeyListener(this);
+		}
+
+		// doing nothing lol
+		@Override
+		public void keyTyped(KeyEvent e) {
+		}
+
+		// remove focus from spinner if enter or space pressed
+		@Override
+		public void keyPressed(KeyEvent e) {
+			switch (e.getKeyCode()) {
+				case KeyEvent.VK_ENTER:
+					source.requestFocus();
+					break;
+				case KeyEvent.VK_SPACE:
+					source.requestFocus();
+					source.playPauseHandle();
+					break;
+			}
+		}
+
+		@Override
+		public void keyReleased(KeyEvent e) {
+		}
+	}
+
+	// handle settings change
+	public class valueChange implements ChangeListener {
+
+		stockPlugin stock;
+		String settingName;
+
+		public valueChange(stockPlugin stock, String settingName) {
+			this.stock = stock;
+			this.settingName = settingName;
+		}
+
+		// sets value and gives changes to python
+		@Override
+		public void stateChanged(ChangeEvent e) {
+			stock.changeVal(settingName, (double) (((JSpinner) e.getSource()).getValue()));
+			stock.givePy();
+		}
 	}
 }

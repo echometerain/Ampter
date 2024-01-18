@@ -39,7 +39,7 @@ num_bl: int                 # number of blocks
 
 
 def set_song(path):  # returns true if successful
-    global song, sample_rate, num_frames, bl_size, num_bl
+    global song, sample_rate, num_frames, bl_size, num_bl, ef_selected, is_vst
     with AF(path, "r") as f:  # type: ignore
         # reset info
         ef_selected = False

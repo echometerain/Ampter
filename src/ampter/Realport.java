@@ -16,18 +16,22 @@ import javax.swing.*;
  */
 public class Realport extends javax.swing.JPanel implements Runnable {
 
-	static int delta = 25;
-	static Ampter parent;
-	boolean dragging = false;
+	final int DELTA = 25; // frame pause
+	final int SMOOTH_PADDING = 2;
+	final double BRUSHSTROKE_FACTOR = 50.0;
+	final int PLAYHEAD_STROKE_SIZE = 4;
+
+	static Ampter parent; // for calling non-static functions
+	boolean dragging = false; // if user is dragging
 	int dragFromX = 0;
 	int dragFromY = 0;
-	boolean wasPlaying = false;
-	long startTime = 0;
+	boolean wasPlaying = false; // if audio was playing before
+	long startTime = 0; // nanosecond time when playback started
 
 	/**
 	 * Creates new form Realport
 	 *
-	 * @param parent
+	 * @param parent Dirty hack for calling non-static functions
 	 */
 	public Realport(Ampter parent) {
 		initComponents();
@@ -45,8 +49,8 @@ public class Realport extends javax.swing.JPanel implements Runnable {
 		// get needed variables
 		int ppb = Ampter.getPpb();
 		int num_bl = Ampter.getNum_bl();
-		int leftBlock = Math.max(Ampter.getViewLeft() / ppb - 2, 0); // -2 & +2 for smooth scrolling
-		int rightBlock = Math.min(Ampter.getViewRight() / ppb + 2, num_bl - 1);
+		int leftBlock = Math.max(Ampter.getViewLeft() / ppb - SMOOTH_PADDING, 0); // -2 & +2 for smooth scrolling
+		int rightBlock = Math.min(Ampter.getViewRight() / ppb + SMOOTH_PADDING, num_bl - 1);
 		int viewHeight = Ampter.getViewHeight();
 		BufferedImage[][] specs = Ampter.getSpecs();
 		// swing needs me to do this for some reason
@@ -63,37 +67,43 @@ public class Realport extends javax.swing.JPanel implements Runnable {
 			}
 		}
 
+		// handle playing
 		boolean playing = Ampter.isPlaying();
 		int headPos = Ampter.getHeadPos();
 		if (playing && !wasPlaying) {
+			// jump to playhead when playback starts
 			if (headPos < Ampter.viewLeft || headPos > Ampter.viewRight) {
 				parent.gotoPos(headPos);
 			}
 			wasPlaying = true;
 			startTime = System.nanoTime();
 		}
+		// reset when playhead stops
 		if (!playing && wasPlaying) {
 			wasPlaying = false;
 			startTime = 0;
 		}
 
-		// draw playhead
-		g2.setStroke(new BasicStroke(4));
-		g.setColor(Color.white);
 		if (playing) {
+			// calculate headPos in pixels (the cursed 10E-9 is for handling nanoseconds)
 			headPos += (int) ((System.nanoTime() - startTime) / 1000000000.0 * Ampter.getBl_freq() * ppb);
+			// make it so playhead is always visible
+			if (headPos > Ampter.viewRight) {
+				parent.gotoPos(Ampter.viewRight);
+			}
 		}
 
-		if (headPos > Ampter.viewRight) {
-			parent.gotoPos(Ampter.viewRight);
-		}
+		// draw playhead
+		g2.setStroke(new BasicStroke(PLAYHEAD_STROKE_SIZE));
+		g.setColor(Color.white);
 		g.drawLine(headPos, 0, headPos, viewHeight);
 
 		// draw paintbrush
 		Point pos = this.getMousePosition();
 		if (dragging && pos != null) {
+			// blue with half alpha
 			g.setColor(new Color(0, 0, 255, 128));
-			int stroke = (int) (Ampter.getViewHeight() / 50.0 * parent.getSizeSliderLevel());
+			int stroke = (int) (Ampter.getViewHeight() / BRUSHSTROKE_FACTOR * parent.getSizeSliderLevel());
 			Polygon p = new Polygon();
 			p.addPoint(dragFromX, dragFromY - stroke);
 			p.addPoint(dragFromX, dragFromY + stroke);
@@ -110,14 +120,11 @@ public class Realport extends javax.swing.JPanel implements Runnable {
 		while (true) {
 			// redraw every frame
 			repaint();
-//			Point pos = this.getMousePosition();
-//			if (pos != null) {
-//				System.out.println(pos.x + " " + pos.y + " " + Ampter.getViewHeight());
-//			}
 			try {
 				// frame pause
-				Thread.sleep(delta);
+				Thread.sleep(DELTA);
 			} catch (InterruptedException ex) {
+				// netbeans wanted me to do this
 				Logger.getLogger(Realport.class.getName()).log(Level.SEVERE, null, ex);
 			}
 		}
@@ -162,6 +169,7 @@ public class Realport extends javax.swing.JPanel implements Runnable {
         );
     }// </editor-fold>//GEN-END:initComponents
 
+	// handles painting the brushstroke
     private void formMouseDragged(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_formMouseDragged
 		if (!dragging) {
 			Point pos = this.getMousePosition();
@@ -171,17 +179,19 @@ public class Realport extends javax.swing.JPanel implements Runnable {
 		}
     }//GEN-LAST:event_formMouseDragged
 
+	// make the frequency tooltip
     private void formMouseMoved(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_formMouseMoved
 		if (!Ampter.isAudioLoaded()) {
 			return;
 		}
-		// write tooltip info
+		// write tooltip text
 		Point pos = this.getMousePosition();
 		if (pos != null) {
 			this.setToolTipText(Ampter.freqInfo(Ampter.pixToFreq(pos.y)));
 		}
     }//GEN-LAST:event_formMouseMoved
 
+	// end of brushstroke handler
     private void formMouseReleased(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_formMouseReleased
 		Point pos = this.getMousePosition();
 		if (dragging && pos != null) {
@@ -197,6 +207,7 @@ public class Realport extends javax.swing.JPanel implements Runnable {
 		}
     }//GEN-LAST:event_formMouseReleased
 
+	// put playhead at mouse click position
     private void formMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_formMouseClicked
 		Point pos = this.getMousePosition();
 		if (pos != null) {

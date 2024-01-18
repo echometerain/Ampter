@@ -10,6 +10,7 @@ import javax.swing.*;
 import javax.swing.event.*;
 import java.util.*;
 import java.awt.event.*;
+import javax.swing.filechooser.*;
 
 /**
  *
@@ -18,8 +19,12 @@ import java.awt.event.*;
 public class Ampter extends javax.swing.JFrame {
 
 	// notenames for tooltip
-	static String[] noteNames = {"A", "Bb", "B", "C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab"};
-	static stockPlugin[] stocks = new stockPlugin[12];
+	static final String[] noteNames = {"A", "Bb", "B", "C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab"};
+	// most supported audio formats
+	static final FileNameExtensionFilter ff = new FileNameExtensionFilter("Audio Files", "3g2", "3gp", "aac", "ac3", "adts", "aif", "aifc", "aiff", "amr", "au", "bwf", "caf", "ec3", "flac", "latm", "loas", "m4a", "m4b", "m4r", "mov", "mp1", "mp2", "mp3", "mp4", "mpa", "mpeg", "ogg", "qt", "sd2", "snd", "w64", "wav", "xhe");
+	static final int NUM_STOCKS = 12;
+	static final stockPlugin[] stocks = new stockPlugin[NUM_STOCKS]; // array of stock plugins
+
 	static BufferedImage[][] specs; // spectrograms array [channel][block]
 	static boolean playing = false;
 	static boolean audioLoaded = false;
@@ -38,8 +43,8 @@ public class Ampter extends javax.swing.JFrame {
 	static int realWidth = 0; // actual width of the edit region (realport1)
 	static int viewHeight = 0; // scrollpane height
 	static int ppb = 100; // pixels per block
-	static int ppbIncrement = 25;
-	static boolean shiftHeld = false;
+	static int ppbIncrement = 25; // how much to change ppb when resizing
+	static boolean shiftHeld = false; // if you're holding the shift key
 
 	// getter setters spam
 	public double getLeftSliderLevel() {
@@ -208,6 +213,7 @@ public class Ampter extends javax.swing.JFrame {
 		this.setIconImage(new ImageIcon("./assets/ampterIcon.png").getImage());
 		initComponents();
 
+		// get viewable part of viewport1
 		vPort = viewport1.getViewport();
 		// netbeans wants me to write it like this
 		vPort.addChangeListener(this::viewportChangePerformed);
@@ -217,11 +223,7 @@ public class Ampter extends javax.swing.JFrame {
 		for (var e : viewport1.getMouseWheelListeners()) {
 			viewport1.removeMouseWheelListener(e);
 		}
-		viewport1.addMouseWheelListener(new java.awt.event.MouseWheelListener() {
-			public void mouseWheelMoved(java.awt.event.MouseWheelEvent evt) {
-				viewport1MouseWheelMoved(evt);
-			}
-		});
+		viewport1.addMouseWheelListener(this::viewport1MouseWheelMoved);
 
 		realThread = new Thread(realport1);
 		realThread.start();
@@ -233,16 +235,18 @@ public class Ampter extends javax.swing.JFrame {
 	}
 
 	// get new positions for viewable region when dimensions change
+	// view => viewable size/pos, real => real size/pos without scrollbar
 	public void viewportChangePerformed(ChangeEvent evt) {
 		Rectangle rect = vPort.getViewRect();
 		viewLeft = rect.x;
 		viewRight = viewLeft + rect.width;
+		// number of blocks * pixel per block
 		realWidth = num_bl * ppb;
 		viewHeight = rect.height;
 		realport1.setPreferredSize(new Dimension(realWidth, viewHeight));
+		// repaint
 		realport1.revalidate();
 		viewport1.revalidate();
-//        System.out.println("" + viewLeft + " " + viewRight + " " + realWidth + " " + viewHeight);
 	}
 
 	// select stock effect
@@ -251,78 +255,97 @@ public class Ampter extends javax.swing.JFrame {
 		if (stockList.getSelectedIndex() == -1 || evt.getValueIsAdjusting() == true) {
 			return;
 		}
-		VSTUIButton.setEnabled(false);
+		// do things with selected effect
 		int selected = stockList.getSelectedIndex();
-//		System.out.println(selected);
 		stocks[selected].buildPanel(stockOptions);
 		stocks[selected].givePy();
 		ef_selected = true;
-
+		// remove vst
+		VSTUIButton.setEnabled(false);
 	}
 
 	private void viewport1MouseWheelMoved(java.awt.event.MouseWheelEvent evt) {
-		int rotUnits = evt.getWheelRotation();
 		boolean forward = true;
-		if (rotUnits < 0) {
-			rotUnits = Math.abs(rotUnits);
+		// magnitude of getWheelRotation() is always 1 for some reason
+		if (evt.getWheelRotation() < 0) {
 			forward = false;
 		}
 		if (shiftHeld) {
+			// resize if shift key
 			stretchSqeeze(forward);
 		} else {
+			// move forward if no shift key
 			shiftPos(forward);
 		}
 
 	}
 
+	// handle playing and pausing
 	public void playPauseHandle() {
-		// play and pause
 		if (playing) {
 			playing = false;
 		} else {
 			playing = true;
+			// converts headPos (in pixels) to audio frame number
 			PyLink.q.add(new Object[]{PyCalls.METHOD, "play", (int) (((double) headPos) / ppb * bl_size)});
 		}
 	}
 
+	// shift forwards or backwards by 1 second
 	public void shiftPos(boolean forward) {
-		// shift forwards or backwards by 1 second
+		// imagine no implicit boolean-to-int conversion
 		int dir = 1;
 		if (!forward) {
 			dir = -1;
 		}
+		// bl_freq = [Hz], ppb = [pix/Hz]
 		int tmpLeft = viewLeft + dir * bl_freq * ppb;
 		int tmpRight = viewRight + dir * bl_freq * ppb;
+		// out-of-bounds check
 		if (tmpLeft < 0 || tmpRight > realWidth) {
 			return;
 		}
 		viewLeft = tmpLeft;
 		viewRight = tmpRight;
+		// go to position
 		viewport1.getViewport().setViewPosition(new Point(viewLeft, 0));
 	}
 
+	// pos in pixels
 	public void gotoPos(int pos) {
-		// pos in pixels
 		if (pos < 0 || pos > realWidth) {
 			return;
 		}
 		viewRight = pos + viewRight - viewLeft;
 		viewLeft = pos;
+		// go to position
 		viewport1.getViewport().setViewPosition(new Point(viewLeft, 0));
 	}
 
+	// resize each spectrogram
 	public void stretchSqeeze(boolean stretch) {
 		int dir = 1;
 		if (!stretch) {
 			dir = -1;
 		}
+		// plus / minus increment
 		int tmpPpb = ppb + dir * ppbIncrement;
+		// shouldn't be zero
 		if (tmpPpb <= 0) {
 			return;
 		}
+		// make a new headpos
 		headPos = (int) (headPos / ((double) ppb) * tmpPpb);
 		ppb = tmpPpb;
 		viewportChangePerformed(null);
+	}
+
+	// not implemented
+	public void errorHandle(String error) {
+		errorDialog.removeAll();
+		errorDialog.add(new JLabel(error));
+		errorDialog.revalidate();
+		errorDialog.setVisible(true);
 	}
 
 	/**
@@ -338,6 +361,7 @@ public class Ampter extends javax.swing.JFrame {
         jMenu1 = new javax.swing.JMenu();
         jMenu2 = new javax.swing.JMenu();
         chooseFiles = new javax.swing.JFileChooser();
+        errorDialog = new javax.swing.JDialog();
         leftPanel = new javax.swing.JPanel();
         loadAudio = new javax.swing.JButton();
         effectsLabel = new javax.swing.JLabel();
@@ -367,6 +391,24 @@ public class Ampter extends javax.swing.JFrame {
 
         jMenu2.setText("Edit");
         jMenuBar1.add(jMenu2);
+
+        errorDialog.setDefaultCloseOperation(javax.swing.WindowConstants.DISPOSE_ON_CLOSE);
+        errorDialog.setTitle("Error!");
+        errorDialog.setAlwaysOnTop(true);
+        errorDialog.setFont(new java.awt.Font("Cantarell", 0, 15)); // NOI18N
+        errorDialog.setIconImage(null);
+        errorDialog.setType(java.awt.Window.Type.POPUP);
+
+        javax.swing.GroupLayout errorDialogLayout = new javax.swing.GroupLayout(errorDialog.getContentPane());
+        errorDialog.getContentPane().setLayout(errorDialogLayout);
+        errorDialogLayout.setHorizontalGroup(
+            errorDialogLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGap(0, 400, Short.MAX_VALUE)
+        );
+        errorDialogLayout.setVerticalGroup(
+            errorDialogLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGap(0, 300, Short.MAX_VALUE)
+        );
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
         setTitle("Ampter");
@@ -611,36 +653,46 @@ public class Ampter extends javax.swing.JFrame {
     private void loadVSTButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_loadVSTButtonActionPerformed
 		// give vst file to python
 		chooseFiles.setFileSelectionMode(JFileChooser.FILES_AND_DIRECTORIES);
+		chooseFiles.removeChoosableFileFilter(ff);
 		int returnVal = chooseFiles.showOpenDialog(this);
 		if (returnVal != JFileChooser.APPROVE_OPTION) {
 			return;
 		}
 		PyLink.q.add(new Object[]{PyCalls.METHOD, "set_vst_effect", chooseFiles.getSelectedFile().getPath()});
-
-		VSTUIButton.setEnabled(true);
-		// disable stock effect
+		// disable stock effects
 		stockList.setSelectedIndex(-1);
 		stockList.setSelectedValue(null, false);
-
 		stockOptions.removeAll();
 		stockOptions.revalidate();
 		stockOptions.repaint();
 		stockList.validate();
+		// show that effects are selected
 		ef_selected = true;
+		VSTUIButton.setEnabled(true);
     }//GEN-LAST:event_loadVSTButtonActionPerformed
 
+	// open vst ui
     private void VSTUIButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_VSTUIButtonActionPerformed
-		// open vst ui
 		PyLink.q.add(new Object[]{PyCalls.METHOD, "open_vst_ui"});
     }//GEN-LAST:event_VSTUIButtonActionPerformed
 
+	// load audio
     private void loadAudioActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_loadAudioActionPerformed
-		// give audio file to python
+		// remove values
+		ef_selected = false;
+		stockOptions.removeAll();
+		stockOptions.revalidate();
+		VSTUIButton.setEnabled(false);
+
+		// make file chooser
 		chooseFiles.setFileSelectionMode(JFileChooser.FILES_ONLY);
+		chooseFiles.addChoosableFileFilter(ff);
+		chooseFiles.setFileFilter(ff);
 		int returnVal = chooseFiles.showOpenDialog(this);
 		if (returnVal != JFileChooser.APPROVE_OPTION) {
 			return;
 		}
+		// give audio file to python
 		PyLink.q.add(new Object[]{PyCalls.LOAD_AUDIO, chooseFiles.getSelectedFile().getPath(), this});
 
 		// enable sliders and buttons
@@ -664,7 +716,9 @@ public class Ampter extends javax.swing.JFrame {
 		shiftPos(true);
     }//GEN-LAST:event_shiftForwardActionPerformed
 
+	// I should have used a square emoji instead of X but java doesn't support it
     private void stopResetActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_stopResetActionPerformed
+		// go to beginning
 		gotoPos(0);
 		if (playing) {
 			playPauseHandle();
@@ -676,6 +730,7 @@ public class Ampter extends javax.swing.JFrame {
 		shiftPos(false);
     }//GEN-LAST:event_shiftBackActionPerformed
 
+	// save changed audio
     private void saveAudioActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_saveAudioActionPerformed
 		// give save file location to python
 		int returnVal = chooseFiles.showSaveDialog(this);
@@ -685,6 +740,7 @@ public class Ampter extends javax.swing.JFrame {
 		PyLink.q.add(new Object[]{PyCalls.METHOD, "save_song", chooseFiles.getSelectedFile().toString()});
     }//GEN-LAST:event_saveAudioActionPerformed
 
+	// shortcuts handler
     private void formKeyPressed(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_formKeyPressed
 		// play audio with space
 		switch (evt.getKeyCode()) {
@@ -703,6 +759,7 @@ public class Ampter extends javax.swing.JFrame {
 		}
     }//GEN-LAST:event_formKeyPressed
 
+	// handles user releasing the shift key
     private void formKeyReleased(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_formKeyReleased
 		switch (evt.getKeyCode()) {
 			case KeyEvent.VK_SHIFT:
@@ -727,6 +784,7 @@ public class Ampter extends javax.swing.JFrame {
     private javax.swing.JFileChooser chooseFiles;
     private javax.swing.JScrollPane chooseStock;
     private javax.swing.JLabel effectsLabel;
+    private javax.swing.JDialog errorDialog;
     private javax.swing.JMenu jMenu1;
     private javax.swing.JMenu jMenu2;
     private javax.swing.JMenuBar jMenuBar1;
