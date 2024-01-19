@@ -10,6 +10,8 @@ import javax.swing.*;
 import javax.swing.event.*;
 import java.util.*;
 import java.awt.event.*;
+import java.io.File;
+import java.net.URISyntaxException;
 import javax.swing.filechooser.*;
 
 /**
@@ -191,6 +193,20 @@ public class Ampter extends javax.swing.JFrame {
 		return 700.0 * (Math.pow(10.0, loc_mel / 2595.0) - 1.0);
 	}
 
+	// get actual location of files
+	// based on https://stackoverflow.com/questions/320542/how-to-get-the-path-of-a-running-jar-file
+	// and https://stackoverflow.com/questions/482560/can-you-tell-on-runtime-if-youre-running-java-from-within-a-jar
+	public static String realLoc(String loc) {
+		try {
+			if (Ampter.class.getResource("Ampter.class").toString().startsWith("jar")) {
+				return new File(Ampter.class.getProtectionDomain().getCodeSource().getLocation().toURI()).getParentFile().getPath() + "/" + loc;
+			}
+			return "./" + loc;
+		} catch (URISyntaxException e) {
+			return "";
+		}
+	}
+
 	/**
 	 * Creates new form Ampter
 	 */
@@ -210,7 +226,7 @@ public class Ampter extends javax.swing.JFrame {
 		// start python
 		pyThread.start();
 		// set ampter logo
-		this.setIconImage(new ImageIcon("./assets/ampterIcon.png").getImage());
+		this.setIconImage(new ImageIcon(realLoc("assets/ampterIcon.png")).getImage());
 		initComponents();
 
 		// get viewable part of viewport1

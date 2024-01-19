@@ -128,7 +128,7 @@ public class PyLink implements Runnable {
 		SharedInterpreter.setConfig(conf);
 		// connect to backend
 		interp = new SharedInterpreter();
-		interp.runScript("./backend.py");
+		interp.runScript(Ampter.realLoc("backend.py"));
 
 		while (true) {
 			// sleep for delta ms

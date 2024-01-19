@@ -36,7 +36,7 @@ public class stockPlugin {
 
 		// write [min, value, max] according to https://spotify.github.io/pedalboard/reference/pedalboard.html
 		HashMap<String, double[]> gain = new HashMap<>();
-		gain.put("gain_db", new double[]{0, 1, dMax});
+		gain.put("gain_db", new double[]{dMin, 1, dMax});
 		HashMap<String, double[]> bitcrush = new HashMap<>();
 		bitcrush.put("bit_depth", new double[]{0, 1, 32});
 		HashMap<String, double[]> chorus = new HashMap<>();
