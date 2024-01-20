@@ -66,6 +66,8 @@ public class Realport extends javax.swing.JPanel implements Runnable {
 				g.drawImage(specs[1][i], i * ppb, 0, ppb, viewHeight, this);
 			}
 		}
+		// reset alpha level
+		g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1));
 
 		// handle playing
 		boolean playing = Ampter.isPlaying();
