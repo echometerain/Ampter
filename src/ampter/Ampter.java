@@ -24,7 +24,7 @@ public class Ampter extends javax.swing.JFrame {
 	static final String[] noteNames = {"A", "Bb", "B", "C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab"};
 	// most supported audio formats
 	static final FileNameExtensionFilter ff = new FileNameExtensionFilter("Audio Files", "3g2", "3gp", "aac", "ac3", "adts", "aif", "aifc", "aiff", "amr", "au", "bwf", "caf", "ec3", "flac", "latm", "loas", "m4a", "m4b", "m4r", "mov", "mp1", "mp2", "mp3", "mp4", "mpa", "mpeg", "ogg", "qt", "sd2", "snd", "w64", "wav", "xhe");
-	static final int NUM_STOCKS = 12;
+	static final int NUM_STOCKS = 12; // number of stock plugins
 	static final stockPlugin[] stocks = new stockPlugin[NUM_STOCKS]; // array of stock plugins
 
 	static BufferedImage[][] specs; // spectrograms array [channel][block]
