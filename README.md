@@ -3,7 +3,8 @@ Audio Mastering Painter, an app that lets you paint on sound.
 
 ---
 ![image](https://github.com/echometerain/Ampter/assets/70437021/992a6be4-7638-4959-87e5-f33b800d87a9)
-***Shortcuts:***
+---
+Shortcuts:
 - **Click:** change playhead position
 - **Drag:** draw with brush (effect)
 - **Scroll:** move left/right one block (.25 second) at a time
