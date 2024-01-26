@@ -4,7 +4,7 @@ Audio Mastering Painter, an app that lets you paint on sound.
 ---
 ![image](https://github.com/echometerain/Ampter/assets/70437021/12fae264-0db4-43e6-b3ee-d0ee6431c5c7)
 - Dragging your mouse across the spectrogram will apply your chosen effect onto the region you selected
-- Try to select `Gain` in the effects menu, set `gain_db` to `20`, draw on the spectrogram, and hear what it sounds like
+- Try selecting `Gain` in the effects menu, setting `gain_db` to `20`, drawing on the spectrogram, and hearing what it sounds like
 
 ---
 ![image](https://github.com/echometerain/Ampter/assets/70437021/992a6be4-7638-4959-87e5-f33b800d87a9)
